@@ -8,7 +8,7 @@ library(Biostrings)
 library(quantmod)
 library(h5)
 library(keras)
-library(HiddenGenome)
+library(altum)
 library(dygraphs)
 
 source("utils.R")
