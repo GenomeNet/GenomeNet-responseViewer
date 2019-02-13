@@ -1,0 +1,16 @@
+@import url('https://fonts.googleapis.com/css?family=Lato:100,200,300,400,500,700');
+
+
+h1{
+  font-family: 'Roboto', sans-serif;
+}
+
+h2 {
+  font: 23px/100% 'Lato';
+}
+
+html *
+{
+   color: #000 !important;
+   font-family: 'Lato' !important;
+}
