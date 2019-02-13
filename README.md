@@ -19,5 +19,5 @@ runApp()
 
 Please enter a genomic sequence (nucleotides) in the input area or upload a .fasta file. Hidden states will be infered using `hiddengenome/altum` and visualised. You can select different cells on the left. 
 
-![Web app](/scr/images/figure.png)
+![Web app](scr/images/figure.png)
 
