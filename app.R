@@ -9,15 +9,21 @@ library(quantmod)
 library(h5)
 library(keras)
 library(altum)
+require(pairsD3)
+library(highcharter)
+
+
+
 library(dygraphs)
 
 source("utils.R")
 
+# UI ---------------------------------------------------------------------------
 ui <- fluidPage(theme = "bootstrap.css",
                 
                 # Application title
                 titlePanel("HiddenGenome"),
-                
+                # Inputs ------------------------------------------------------- 
                 # Sidebar with a slider input for number of bins
                 sidebarLayout(
                   sidebarPanel(
@@ -51,12 +57,18 @@ ui <- fluidPage(theme = "bootstrap.css",
                       multiple = TRUE
                     )
                   ),
-                  
-                  # Show a plot of the generated distribution
-                  mainPanel(dygraphOutput("dygraph")
+                  # Output -----------------------------------------------------    
+                  mainPanel(
+                    tabsetPanel(
+                      tabPanel("position", dygraphOutput("dygraph")), 
+                      tabPanel("correlation", pairsD3Output("pairs",
+                                                            width = "80%", 
+                                                            height = 1300))
+                     
+                    )
+                           
                   )))
-
-# Define server logic required to draw a histogram
+# SERVER -----------------------------------------------------------------------
 server <- function(input, output, session) {
   # get the input sequence either by textareainput or fileinput
   sequence  <- reactive({
@@ -109,6 +121,18 @@ server <- function(input, output, session) {
       dyLegend(show = "onmouseover", hideOnMouseOut = FALSE)  %>%
       dyOptions(stepPlot = TRUE) %>% dyRangeSelector()
   })
+  
+  output$pairs <- renderPairsD3({
+    cell_num <- as.numeric(input$selectinput_cell)
+    states_df <- dataset()[, cell_num]
+    cell_df <- data.frame(pos = 1:nrow(dataset()),
+                          states_df)
+    is_crispr <- c(rep("A", nrow(cell_df) - 100), rep("B", 100))
+    pairsD3(cell_df, group = is_crispr, cex = 1, 
+            theme = "bw", big = T, opacity = 0.5,
+            leftmar = 10, topmar = 0, width = 800)
+  })
+
 }
 # Run the application
 shinyApp(ui = ui, server = server)
