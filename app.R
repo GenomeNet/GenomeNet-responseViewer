@@ -1,6 +1,6 @@
 # This is a Shiny web application for visualization of hidden states of
-# LSTM models. You can run the application by clickingthe 'Run App' button
-# above if you are using RStudio
+# LSTM models. You can run the application by clicking the 'Run App' button
+# above (only if you are using RStudio).
 # Author: philipp.muench@helmholtz-hzi.de
 
 library(shiny)
@@ -76,38 +76,38 @@ ui <- fluidPage(theme = "bootstrap.css",
                     tags$hr(),
                     selectInput(
                       "selectinput_cell",
-                      "cell number(s)",
+                      "Cell number(s)",
                       selected = 1,
                       choices = 1:125 ,
                       multiple = TRUE
                     ),
                     numericInput(
                       "numericInput_start",
-                      "start position",
+                      "Start position",
                       800,
                       min = 1,
                       max = 4000),
                     numericInput(
                       "numericInput_end",
-                      "end position",
+                      "End position",
                       1500,
                       min = 1,
                       max = 4000)
                   ),
                   # Output -----------------------------------------------------
                   mainPanel(tabsetPanel(
-                    tabPanel("position", dygraphOutput("dygraph"), dygraphOutput("dygraph2", height = 50)),
+                    tabPanel("Position", dygraphOutput("dygraph"), dygraphOutput("dygraph2", height = 50)),
                     tabPanel(
-                      "correlation",
+                      "Correlation",
                       pairsD3Output("pairs",
                                     width = "80%",
                                     height = 1300)
                     ),
                     tabPanel(
-                      "repeat_correlation",
+                      "Repeat_correlation",
                       DT::dataTableOutput("table1"),
                       plotOutput("plot1")
-                #      ggvisOutput("plot2")
+                      #ggvisOutput("plot2")
                     )
                   ))
                 ))
@@ -122,7 +122,7 @@ server <- function(input, output, session) {
       output
     } else if (isTruthy(input$fileinput_fasta)) {
       progress <- shiny::Progress$new()
-      progress$set(message = "loading fasta file", value = 0)
+      progress$set(message = "Loading fasta file", value = 0)
       records <- readDNAStringSet(input$fileinput_fasta$datapath)
       first_seq <- paste(records)[1]
       on.exit(progress$close())
@@ -138,14 +138,15 @@ server <- function(input, output, session) {
     if (input$selectinput_dataset == "generate"){
       req(sequence())
       progress <- shiny::Progress$new()
-      progress$set(message = "preprocess", value = 0)
-      preprocessed_text <- preprocess(sequence(),
-                                      vocabulary = c("\n", "a", "c", "g", "t"))
+      progress$set(message = "Preprocessing ...", value = 0)
+      preprocessed_text <- preprocessSemiRedundant(char = sequence(),
+                                      vocabulary = c("\n", "a", "c", "g", "t"),
+                                      maxlen = 10) #maxlen only to test
       
       #generate hdf5 file with state information
-      progress$set(message = "computing states", value = 1)
+      progress$set(message = "Computing states ...", value = 1)
       states <-
-        getstates(paste0("data/model/", input$selectinput_model),
+        getStates(paste0("data/model/", input$selectinput_model),
                   preprocessed_text$X,
                   type = "csv")
       on.exit(progress$close())
@@ -153,7 +154,7 @@ server <- function(input, output, session) {
     } else {
       req(input$selectinput_states)
       progress <- shiny::Progress$new()
-      progress$set(message = "loading states", value = 1)
+      progress$set(message = "Loading states ...", value = 1)
       states <-
         read.table(
           paste0("data/ncbi_data/states/", input$selectinput_states),
@@ -169,10 +170,10 @@ server <- function(input, output, session) {
   # load coordinates of CRISPR information if input$selectinput_states
   metadata <- reactive({
     # todo: check if file exists
-    print("load metadata")
+    print("Load metadata")
     req(input$selectinput_states)
     progress <- shiny::Progress$new()
-    progress$set(message = "loading array annotation", value = 1)
+    progress$set(message = "Loading array annotation ...", value = 1)
     metadata <-
       read.table(
         paste0("data/ncbi_data/position/", input$selectinput_states),
@@ -188,10 +189,10 @@ server <- function(input, output, session) {
   # load coordinates of CRISPR information if input$selectinput_states
   taxadata <- reactive({
     # todo: check if file exists
-    print("load taxonomic data")
+    print("Load taxonomic data ...")
     req(input$selectinput_states)
     progress <- shiny::Progress$new()
-    progress$set(message = "loading taxon annotation", value = 1)
+    progress$set(message = "Loading taxon annotation ...", value = 1)
     taxadata <-
       read.table(
         paste0("data/ncbi_data/meta/", input$selectinput_states),
@@ -207,7 +208,7 @@ server <- function(input, output, session) {
   annotation <- reactive({
     if (isTruthy(input$fileinput_gff)) {
       progress <- shiny::Progress$new()
-      progress$set(message = "loading gff file", value = 0)
+      progress$set(message = "Loading gff file ...", value = 0)
       gff <- read.gff(input$fileinput_gff$datapath)
       # filter by direct_repeat
       gff <- gff[which(gff$type == "direct_repeat"), ]
