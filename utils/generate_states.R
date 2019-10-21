@@ -1,6 +1,6 @@
 # this script generates hidden state responses to preprocessed text and saves it in the required format
 
-library(altum)
+library(deepG)
 library(readr)
 
 maxlen <- 30
