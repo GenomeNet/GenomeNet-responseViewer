@@ -13,11 +13,11 @@ files <- list.files(dir, full.names = T)
 for (file in files) {
   base <- basename(substr(file, 1, nchar(file) - 4))
   genome <- read_lines(file)
-  genome_pre <- preprocess(genome,
+  genome_pre <- preprocessSemiRedundant(genome,
                            maxlen = maxlen,
                            vocabulary = c("\n", "a", "c", "g", "t"))
   
-  states <- getstates(model_path,
+  states <- getStates(model_path,
                       genome_pre$X,
                       maxlen = maxlen,
                       type = "csv")

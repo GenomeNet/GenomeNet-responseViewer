@@ -15,7 +15,7 @@ library(pairsD3)
 library(ggplot2)
 library(dygraphs)
 library(ape)
-library(ggvis)
+#library(ggvis)
 
 source("utils.R")
 
@@ -23,27 +23,27 @@ source("utils.R")
 ui <- fluidPage(theme = "bootstrap.css",
                 
                 # Application title
-                titlePanel("HiddenGenome"),
+                titlePanel("GenomeNet"),
                 # Inputs -------------------------------------------------------
                 # Sidebar with a slider input for number of bins
                 sidebarLayout(
                   sidebarPanel(
                     selectInput(
                       "selectinput_dataset",
-                      "Dataset",
+                      "Dataset:",
                       c("precalculated", "generate")
                     ),
                     conditionalPanel(
                       condition = "input.selectinput_dataset == 'generate'",
                       textAreaInput(
                         "textareainput_genome",
-                        "Input genome sequence (nt)",
+                        "Input genome sequence (nt):",
                         width = "100%",
                         height = "200px"
                       ),
                       fileInput(
                         "fileinput_fasta",
-                        "or choose file (fasta)",
+                        "Or upload FASTA file:",
                         multiple = FALSE,
                         accept = c(
                           "text/fasta",
@@ -53,7 +53,7 @@ ui <- fluidPage(theme = "bootstrap.css",
                       ),
                       fileInput(
                         "fileinput_gff3",
-                        "upload gff3 annotation file",
+                        "Or upload a .gff3 annotation file:",
                         multiple = FALSE,
                         accept = c(
                           "text/gff3",
@@ -61,15 +61,28 @@ ui <- fluidPage(theme = "bootstrap.css",
                           ".gff3"
                         )
                       ),
+                      
+                      fileInput(
+                        "fileinput_hdf5",
+                        "Upload a .hdf5 file with a trained model:",
+                        multiple = FALSE,
+                        accept = c(
+                          "text/hdf5",
+                          "hdf5"
+                        )
+                      ),
+                      
                       # let user select the model stored as .Rdata in data/model/
-                      selectInput('selectinput_model', 'Select model',
+                      selectInput('selectinput_model', 'Select model:',
                                   choice = list.files('data/model/'))
                     ),
+                    
+                    
                     conditionalPanel(
                       condition = "input.selectinput_dataset == 'precalculated'",
                       selectInput(
                         'selectinput_states',
-                        'Select precalculated cell response',
+                        'Select precalculated cell response:',
                         choice = list.files('data/ncbi_data/states/')
                       )
                     ),
@@ -101,14 +114,18 @@ ui <- fluidPage(theme = "bootstrap.css",
                       "Correlation",
                       pairsD3Output("pairs",
                                     width = "80%",
-                                    height = 1300)
+                                    height = 1200)
                     ),
                     tabPanel(
-                      "Repeat_correlation",
-                      DT::dataTableOutput("table1"),
-                      plotOutput("plot1")
-                      #ggvisOutput("plot2")
-                    )
+                      "Repeat-Correlation",
+                      DT::dataTableOutput("table1")
+                    ),
+                    
+                    tabPanel("Repeat-Correlation2",
+                             plotOutput("plot1")
+                    ),
+                    # ggvisOutput("plot2"),
+                    tabPanel("About", title, br(), description, tags$img(src="Logo.png"))
                   ))
                 ))
 # SERVER -----------------------------------------------------------------------
@@ -140,17 +157,16 @@ server <- function(input, output, session) {
       progress <- shiny::Progress$new()
       progress$set(message = "Preprocessing ...", value = 0)
       preprocessed_text <- preprocessSemiRedundant(char = sequence(),
-                                      vocabulary = c("\n", "a", "c", "g", "t"),
-                                      maxlen = 10) #maxlen only to test
+                                      vocabulary = c("\n", "a", "c", "g", "t"), maxlen = 30) #maxlen only to test
       
       #generate hdf5 file with state information
       progress$set(message = "Computing states ...", value = 1)
-      states <-
+        
+        states <-
         getStates(paste0("data/model/", input$selectinput_model),
                   preprocessed_text$X,
                   type = "csv")
       on.exit(progress$close())
-      states
     } else {
       req(input$selectinput_states)
       progress <- shiny::Progress$new()
@@ -170,7 +186,7 @@ server <- function(input, output, session) {
   # load coordinates of CRISPR information if input$selectinput_states
   metadata <- reactive({
     # todo: check if file exists
-    print("Load metadata")
+    print("Load metadata ...")
     req(input$selectinput_states)
     progress <- shiny::Progress$new()
     progress$set(message = "Loading array annotation ...", value = 1)
@@ -307,15 +323,14 @@ server <- function(input, output, session) {
   }, height = 700)
 
   
-#  vis <- reactive({
-#    if(!is.null(within_repeat_data())){
-#      dat <- as.data.frame(within_repeat_data())
-#      dat 
-#    }
-#    })
- # within_repeat_data %>% bind_shiny("plot2")
-  
-  
+  # vis <- reactive({
+  #   if(!is.null(within_repeat_data())){
+  #     dat <- as.data.frame(within_repeat_data())
+  #    dat
+  #    }
+  #   })
+  # within_repeat_data %>% bind_shiny("plot2")
+
 }
 # Run the application
 shinyApp(ui = ui, server = server)

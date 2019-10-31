@@ -30,3 +30,9 @@ nucleotide2value <- function(nucleotides){
   values <- mapvalues(nuc, c("A", "C", "G", "T"), c(0, 0.33, 0.66, 1))
   return(values)
 }
+
+
+title <- p(strong("GenomeNet - Toolbox for deep neural networks for genomic modelling"))
+description <- p("deepG is a package for generating LSTM models from genomic text and provides scripts for various 
+                 common tasks such as the extraction of cell responses. It also comes with example datasets of genomic 
+                 and human readable languages for testing.")
