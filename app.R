@@ -1,9 +1,104 @@
-# This is a Shiny web application for visualization of hidden states of
-# LSTM models. You can run the application by clicking the 'Run App' button
-# above (only if you are using RStudio).
-# Author: philipp.muench@helmholtz-hzi.de
+######utlis.R - unused functions #####
 
-library(shiny)
+#' #' Allowing reset of zooming in dygraph
+#' #' @param dygraph
+#' #' @export
+#' dyUnzoom <- function(dygraph) {
+#'   dyPlugin(
+#'     dygraph = dygraph,
+#'     name = "Unzoom",
+#'     path = system.file("plugins/unzoom.js", package = "dygraphs")
+#'   )
+#' }
+
+#' 
+#' #' Dygraph
+#' #' @param dygraph
+#' #' @param x
+#' #' @param text
+#' #' @export
+#' presAnnotation <- function(dygraph, x, text) {
+#'   dygraph %>%
+#'     dyAnnotation(x, text, attachAtBottom = TRUE, width = 60, height= 20)
+#' }
+#####utlis.R - used function #####
+#' Dygraph
+#' @param dy
+#' @param from
+#' @param to
+#' @param color
+#' @export
+vec_dyShading <- function(dy, from, to, color){
+  for (i in seq_along(from)) {
+    dy <- dyShading(dy, from = from[i], 
+                    to = to[i]) #,
+                    #color = color[i])
+  }
+  dy
+}
+
+#' Change nucleotides to values
+#' 
+#' A has the value 0, C 0.33, G 0.66 and T 1
+#' @param nucleotides nucleotides from the genomic sequence
+#' @export
+nucleotide2value <- function(nucleotides){
+  require(plyr) #remove in deepG
+  nuc <- unlist(strsplit(nucleotides, "", fixed = TRUE))
+  values <- mapvalues(nuc, c("A", "C", "G", "T"), c(0, 0.33, 0.66, 1))
+  return(values)
+}
+
+######generate.states - Unused###### 
+
+# library(deepG)
+# library(readr)
+# 
+# maxlen <- 30
+# 
+# model_path <- "data/model/example_run_full_model.hdf5"
+# # 
+# dir <- "ncbi_data/genome"
+# files <- list.files(dir, full.names = T)
+# 
+# for (file in files) {
+#   base <- basename(substr(file, 1, nchar(file) - 4))
+#   genome <- read_lines(file)
+#   genome_pre <- preprocessSemiRedundant(genome,
+#                                         maxlen = maxlen,
+#                                         vocabulary = c("\n", "a", "c", "g", "t"))
+#   
+#   states <- getStates(model_path,
+#                       genome_pre$X,
+#                       maxlen = maxlen,
+#                       type = "csv")
+#   
+#   write.table(states, file = paste0("ncbi_data/states/" , base ,".csv"),
+#               col.names = F,
+#               row.names = F,
+#               quote = F, sep = ";")
+#   
+# }
+######Shiny app########
+
+#' This is a Shiny web application for the visualization of hidden states of
+#' LSTM models. Default will show the states from data: GCF_000008365.1_
+#' ASM836v1_genomic and GCF_000006605.1_ASM660v1_genomic. It also comes with 
+#' the possibility to use trained models.
+#' 
+#' @param sample  preprocess$x -> getStates
+#' @param model.path path to model
+#' @param maxlen maxlen 
+#' @param batch.size batch.size
+#' @param fasta.path path to fasta files -> preprocessFasta -> getStatesfromFasta
+#' @export
+visualizePrediction <- function(sample = "",
+                                model.path = "data/model/example_run_full_model.hdf5",
+                                maxlen = 30,
+                                batch.size = 100,
+                                fasta.path = "example_files/fasta"){
+
+library(shiny) #remove in deepG
 library(Biostrings)
 library(readr)
 library(quantmod)
@@ -15,124 +110,77 @@ library(pairsD3)
 library(ggplot2)
 library(dygraphs)
 library(ape)
-#library(ggvis)
 
-source("utils.R")
-
+# Generate the user interface
 # UI ---------------------------------------------------------------------------
-ui <- fluidPage(theme = "bootstrap.css",
+ui <- fluidPage(theme = "www/bootstrap.css",
                 
                 # Application title
-                titlePanel("GenomeNet"),
+                titlePanel("GenomeNet - deepG"),
                 # Inputs -------------------------------------------------------
-                # Sidebar with a slider input for number of bins
+                # Sidebar
                 sidebarLayout(
                   sidebarPanel(
                     selectInput(
                       "selectinput_dataset",
                       "Dataset:",
-                      c("precalculated", "generate")
+                      c("calculated hidden states","examples")
                     ),
+                    
                     conditionalPanel(
-                      condition = "input.selectinput_dataset == 'generate'",
-                      textAreaInput(
-                        "textareainput_genome",
-                        "Input genome sequence (nt):",
-                        width = "100%",
-                        height = "200px"
-                      ),
-                      fileInput(
-                        "fileinput_fasta",
-                        "Or upload FASTA file:",
-                        multiple = FALSE,
-                        accept = c(
-                          "text/fasta",
-                          "text/comma-separated-values,text/plain",
-                          ".csv"
-                        )
-                      ),
-                      fileInput(
-                        "fileinput_gff3",
-                        "Or upload a .gff3 annotation file:",
-                        multiple = FALSE,
-                        accept = c(
-                          "text/gff3",
-                          "text/comma-separated-values,text/plain",
-                          ".gff3"
-                        )
-                      ),
-                      
-                      fileInput(
-                        "fileinput_hdf5",
-                        "Upload a .hdf5 file with a trained model:",
-                        multiple = FALSE,
-                        accept = c(
-                          "text/hdf5",
-                          "hdf5"
-                        )
-                      ),
-                      
-                      # let user select the model stored as .Rdata in data/model/
+                      condition = "input.selectinput_dataset == 'calculated hidden states'",
                       selectInput('selectinput_model', 'Select model:',
-                                  choice = list.files('data/model/'))
-                    ),
-                    
+                                  choice = c(list.files('data/model/'), model.path))), #Add the models right 
                     
                     conditionalPanel(
-                      condition = "input.selectinput_dataset == 'precalculated'",
+                      condition = "input.selectinput_dataset == 'examples'",
                       selectInput(
                         'selectinput_states',
                         'Select precalculated cell response:',
-                        choice = list.files('data/ncbi_data/states/')
-                      )
-                    ),
+                        choice = list.files('data/ncbi_data/states/'))),
+                    
                     tags$hr(),
                     selectInput(
                       "selectinput_cell",
-                      "Cell number(s)",
+                      "Cell number(s):",
                       selected = 1,
                       choices = 1:125 ,
                       multiple = TRUE
                     ),
                     numericInput(
                       "numericInput_start",
-                      "Start position",
+                      "Start position:",
                       800,
                       min = 1,
                       max = 4000),
                     numericInput(
                       "numericInput_end",
-                      "End position",
+                      "End position:",
                       1500,
                       min = 1,
                       max = 4000)
                   ),
                   # Output -----------------------------------------------------
                   mainPanel(tabsetPanel(
-                    tabPanel("Position", dygraphOutput("dygraph"), dygraphOutput("dygraph2", height = 50)),
-                    tabPanel(
-                      "Correlation",
+                    tabPanel("Position:", 
+                             dygraphOutput("dygraph"), 
+                             dygraphOutput("dygraph2", height = 50)),
+                    tabPanel("Correlation:",
                       pairsD3Output("pairs",
                                     width = "80%",
-                                    height = 1200)
-                    ),
-                    tabPanel(
-                      "Repeat-Correlation",
-                      DT::dataTableOutput("table1")
-                    ),
+                                    height = 1200)),
+                    tabPanel("Repeat-Responses:",
+                      DT::dataTableOutput("table1")),
                     
-                    tabPanel("Repeat-Correlation2",
-                             plotOutput("plot1")
-                    ),
-                    # ggvisOutput("plot2"),
-                    tabPanel("About", title, br(), description, tags$img(src="Logo.png"))
+                    tabPanel("Repeat-Responses-Graph:",
+                             plotOutput("plot1"))
                   ))
                 ))
 # SERVER -----------------------------------------------------------------------
 server <- function(input, output, session) {
-  # get the input sequence either by textareainput or fileinput
+  
   sequence  <- reactive({
-    if (input$selectinput_dataset == "generate" && 
+    if (input$selectinput_dataset == "calculated hidden states" &&
         isTruthy(input$textareainput_genome)) {
       input$textareainput_genome
       output <- input$textareainput_genome
@@ -152,16 +200,16 @@ server <- function(input, output, session) {
   # get the hidden states of the input sequence
   dataset <- reactive({
     req(input$selectinput_dataset)
-    if (input$selectinput_dataset == "generate"){
+    if (input$selectinput_dataset == "calculated hidden states"){
       req(sequence())
       progress <- shiny::Progress$new()
       progress$set(message = "Preprocessing ...", value = 0)
       preprocessed_text <- preprocessSemiRedundant(char = sequence(),
-                                      vocabulary = c("\n", "a", "c", "g", "t"), maxlen = 30) #maxlen only to test
-      
+                                      vocabulary = c("\n", "a", "c", "g", "t"), maxlen = maxlen)
+
       #generate hdf5 file with state information
       progress$set(message = "Computing states ...", value = 1)
-        
+
         states <-
         getStates(paste0("data/model/", input$selectinput_model),
                   preprocessed_text$X,
@@ -182,8 +230,11 @@ server <- function(input, output, session) {
       states
     }
   })
+ ##### Add: the sane with the data from fasta.files #####
   
-  # load coordinates of CRISPR information if input$selectinput_states
+  
+  ##### Examples ######
+  # Load coordinates of CRISPR information if input$selectinput_states
   metadata <- reactive({
     # todo: check if file exists
     print("Load metadata ...")
@@ -202,9 +253,8 @@ server <- function(input, output, session) {
     metadata
   })
   
-  # load coordinates of CRISPR information if input$selectinput_states
+  # Load coordinates of CRISPR information if input$selectinput_states
   taxadata <- reactive({
-    # todo: check if file exists
     print("Load taxonomic data ...")
     req(input$selectinput_states)
     progress <- shiny::Progress$new()
@@ -253,7 +303,7 @@ server <- function(input, output, session) {
     }
   })
   
-  #### plotting
+  #### Plotting #####
   output$dygraph <- renderDygraph({
     cell_num <- as.numeric(input$selectinput_cell)
     states_df <- dataset()[, cell_num]
@@ -301,7 +351,6 @@ server <- function(input, output, session) {
       cell_df,
       group = is_crispr,
       cex = 1,
- #     theme = "bw",
       big = T,
       opacity = 0.5,
       leftmar = 10,
@@ -322,15 +371,6 @@ server <- function(input, output, session) {
     print(p)
   }, height = 700)
 
-  
-  # vis <- reactive({
-  #   if(!is.null(within_repeat_data())){
-  #     dat <- as.data.frame(within_repeat_data())
-  #    dat
-  #    }
-  #   })
-  # within_repeat_data %>% bind_shiny("plot2")
-
 }
 # Run the application
-shinyApp(ui = ui, server = server)
+shinyApp(ui = ui, server = server)}

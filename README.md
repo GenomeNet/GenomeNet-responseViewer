@@ -21,5 +21,5 @@ runApp()
 
 Please enter a genomic sequence (nucleotides) in the input area or upload a .fasta file. Hidden states will be infered using `hiddengenome/deepG` and visualized. You can select different cells on the left. 
 
-![Web app](src/images/figure.png)
+![Web app](www/figure.png)
 
