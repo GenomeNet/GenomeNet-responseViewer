@@ -49,36 +49,6 @@ nucleotide2value <- function(nucleotides){
   return(values)
 }
 
-######generate.states - Unused###### 
-
-# library(deepG)
-# library(readr)
-# 
-# maxlen <- 30
-# 
-# model_path <- "data/model/example_run_full_model.hdf5"
-# # 
-# dir <- "ncbi_data/genome"
-# files <- list.files(dir, full.names = T)
-# 
-# for (file in files) {
-#   base <- basename(substr(file, 1, nchar(file) - 4))
-#   genome <- read_lines(file)
-#   genome_pre <- preprocessSemiRedundant(genome,
-#                                         maxlen = maxlen,
-#                                         vocabulary = c("\n", "a", "c", "g", "t"))
-#   
-#   states <- getStates(model_path,
-#                       genome_pre$X,
-#                       maxlen = maxlen,
-#                       type = "csv")
-#   
-#   write.table(states, file = paste0("ncbi_data/states/" , base ,".csv"),
-#               col.names = F,
-#               row.names = F,
-#               quote = F, sep = ";")
-#   
-# }
 ######Shiny app########
 
 #' This is a Shiny web application for the visualization of hidden states of
@@ -104,6 +74,7 @@ visualizePrediction <- function(sample = "",
                                 vocabulary = ""){
 
 library(shiny) #remove in deepG
+library(shinythemes)
 library(Biostrings)
 library(readr)
 library(quantmod)
@@ -118,7 +89,7 @@ library(ape)
 
 # Generate the user interface
 # UI ---------------------------------------------------------------------------
-ui <- fluidPage(theme = "www/bootstrap.css",
+ui <- fluidPage(theme = shinytheme("sandstone"),
                 
                 # Application title
                 titlePanel("GenomeNet - deepG"),
@@ -131,10 +102,11 @@ ui <- fluidPage(theme = "www/bootstrap.css",
                       "Dataset:",
                       c("calculated hidden states","examples")),
                     
-                    conditionalPanel(
+                    if (model.path == "")
+                    {conditionalPanel(
                       condition = "input.selectinput_dataset == 'calculated hidden states'",
                       selectInput('selectinput_model', 'Select model:',
-                                  choice = c(list.files('data/model/'), model.path))),
+                                  choice = c(list.files('data/model/'))))},
                     
                     conditionalPanel(
                       condition = "input.selectinput_dataset == 'examples'",
@@ -202,25 +174,47 @@ server <- function(input, output, session) {
       progress <- shiny::Progress$new()
       progress$set(message = "Preprocessing ...", value = 0)
       if (sample == ""){
+        if(model.path == ""){
         progress$set(message = "Computing states ...", value = 1)
         states <-
           getStatesFromFasta(paste0("data/model/", input$selectinput_model),
                     fasta.path = fasta.path,
                     maxlen = maxlen,
                     batch.size = batch.size)
-        on.exit(progress$close())
+        on.exit(progress$close())}
+        else{
+          progress$set(message = "Computing states ...", value = 1)
+          states <-
+            getStatesFromFasta(model.path,
+                               fasta.path = fasta.path,
+                               maxlen = maxlen,
+                               batch.size = batch.size)
+          on.exit(progress$close())
+        }
         states
       }
       else{
-      preprocessed_text <- preprocessSemiRedundant(char = sequence(), 
+        if (model.path == ""){
+          preprocessed_text <- preprocessSemiRedundant(char = sequence(), 
                                                    maxlen = maxlen, 
-                                                   vocabulary = c("n","a","g","c","t"))
-      progress$set(message = "Computing states ...", value = 1)
-        states <-
-        getStates(paste0("data/model/", input$selectinput_model),
+                                                   vocabulary = c("\n","a","g","c","t"))
+          progress$set(message = "Computing states ...", value = 1)
+          states <-
+          getStates(paste0("data/model/", input$selectinput_model),
                   preprocessed_text$X,
                   maxlen = maxlen)
-      on.exit(progress$close())}
+          on.exit(progress$close())} 
+        else{
+          preprocessed_text <- preprocessSemiRedundant(char = sequence(), 
+                                                       maxlen = maxlen, 
+                                                       vocabulary = c("\n","a","g","c","t"))
+          progress$set(message = "Computing states ...", value = 1)
+          states <-
+            getStates(model.path = model.path,
+                      preprocessed_text$X,
+                      maxlen = maxlen)
+          on.exit(progress$close())
+        }}
       states
     } else {
       req(input$selectinput_states)
@@ -242,7 +236,6 @@ server <- function(input, output, session) {
   # Load coordinates of CRISPR information if input$selectinput_states
   metadata <- reactive({
     # todo: check if file exists
-    print("Load metadata ...")
     req(input$selectinput_states)
     progress <- shiny::Progress$new()
     progress$set(message = "Loading array annotation ...", value = 1)
@@ -260,7 +253,6 @@ server <- function(input, output, session) {
   
   # Load coordinates of CRISPR information if input$selectinput_states
   taxadata <- reactive({
-    print("Load taxonomic data ...")
     req(input$selectinput_states)
     progress <- shiny::Progress$new()
     progress$set(message = "Loading taxon annotation ...", value = 1)
@@ -274,23 +266,6 @@ server <- function(input, output, session) {
     on.exit(progress$close())
     taxadata
   })
-  
-  # load the annotation information
-  # annotation <- reactive({
-  #   if (isTruthy(input$fileinput_gff)) {
-  #     progress <- shiny::Progress$new()
-  #     progress$set(message = "Loading gff file ...", value = 0)
-  #     gff <- read.gff(input$fileinput_gff$datapath)
-  #     # filter by direct_repeat
-  #     gff <- gff[which(gff$type == "direct_repeat"), ]
-  #     if (nrow(gff) > 0) {
-  #       gff
-  #     }
-  #     on.exit(progress$close())
-  #   } else {
-  #     NULL
-  #   }
-  # })
   
   within_repeat_data <- reactive({
     if (!is.null(dataset())) {
@@ -331,7 +306,8 @@ server <- function(input, output, session) {
     ribbonData <- nucleotide2value(genome)
   
     dy <- dygraph(cell_df, group = "a") %>%
-      dyRibbon(data = ribbonData, top = 1, bottom = 0, palette=c("red", "blue", "green", "orange"))
+      dyRibbon(data = ribbonData, top = 1, bottom = 0, palette=c("red", "blue", "green", "yellow"))
+               # A = red, t = blue, c = green, c = orange
     if (!is.null(metadata()))
       dy <- vec_dyShading(dy, metadata()$from, metadata()$to, metadata()$color)
     dy    
@@ -360,7 +336,7 @@ server <- function(input, output, session) {
       opacity = 0.5,
       leftmar = 10,
       topmar = 0,
-      width = 800
+      width = 900
     )
   })
   
@@ -371,8 +347,8 @@ server <- function(input, output, session) {
   
   output$plot1 <- renderPlot({
     dat <- as.data.frame(within_repeat_data())
-    p <- ggplot(dat, aes(x = repeat_responses, y = non_repeat_responses, size=diff)) + geom_point()
-    print(p)}, height = 700)
+    p <- ggplot(dat, aes(x = repeat_responses, y = non_repeat_responses, color = diff, size = diff)) + geom_point()
+    print(p)}, height = 700) 
 
 }
 # Run the application
