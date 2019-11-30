@@ -91,12 +91,17 @@ nucleotide2value <- function(nucleotides){
 #' @param maxlen maxlen 
 #' @param batch.size batch.size
 #' @param fasta.path path to fasta files -> preprocessFasta -> getStatesfromFasta
+#' @param vocabulary used vocabulary
+#' @example 
+#' \dontrun{
+#' visualizePrediction(strrep("ATGTAGTAGTAGTAGTAGATGATGATAGATGCACACACAGATACATAGCATGCTGCT",1000))}
 #' @export
 visualizePrediction <- function(sample = "",
-                                model.path = "data/model/example_run_full_model.hdf5",
+                                model.path = "",
                                 maxlen = 30,
+                                fasta.path = "example_files/fasta",
                                 batch.size = 100,
-                                fasta.path = "example_files/fasta"){
+                                vocabulary = ""){
 
 library(shiny) #remove in deepG
 library(Biostrings)
@@ -124,13 +129,12 @@ ui <- fluidPage(theme = "www/bootstrap.css",
                     selectInput(
                       "selectinput_dataset",
                       "Dataset:",
-                      c("calculated hidden states","examples")
-                    ),
+                      c("calculated hidden states","examples")),
                     
                     conditionalPanel(
                       condition = "input.selectinput_dataset == 'calculated hidden states'",
                       selectInput('selectinput_model', 'Select model:',
-                                  choice = c(list.files('data/model/'), model.path))), #Add the models right 
+                                  choice = c(list.files('data/model/'), model.path))),
                     
                     conditionalPanel(
                       condition = "input.selectinput_dataset == 'examples'",
@@ -145,8 +149,7 @@ ui <- fluidPage(theme = "www/bootstrap.css",
                       "Cell number(s):",
                       selected = 1,
                       choices = 1:125 ,
-                      multiple = TRUE
-                    ),
+                      multiple = TRUE),
                     numericInput(
                       "numericInput_start",
                       "Start position:",
@@ -158,8 +161,7 @@ ui <- fluidPage(theme = "www/bootstrap.css",
                       "End position:",
                       1500,
                       min = 1,
-                      max = 4000)
-                  ),
+                      max = 4000)),
                   # Output -----------------------------------------------------
                   mainPanel(tabsetPanel(
                     tabPanel("Position:", 
@@ -180,19 +182,14 @@ ui <- fluidPage(theme = "www/bootstrap.css",
 server <- function(input, output, session) {
   
   sequence  <- reactive({
-    if (input$selectinput_dataset == "calculated hidden states" &&
-        isTruthy(input$textareainput_genome)) {
-      input$textareainput_genome
-      output <- input$textareainput_genome
+    if (input$selectinput_dataset == "calculated hidden states") {
+      if (sample == "") 
+        {output <- fasta.path}
+      else 
+        {output <- sample}
       output
-    } else if (isTruthy(input$fileinput_fasta)) {
-      progress <- shiny::Progress$new()
-      progress$set(message = "Loading fasta file", value = 0)
-      records <- readDNAStringSet(input$fileinput_fasta$datapath)
-      first_seq <- paste(records)[1]
-      on.exit(progress$close())
-      first_seq
-    } else {
+    }
+    else {
       NULL
     }
   })
@@ -204,17 +201,27 @@ server <- function(input, output, session) {
       req(sequence())
       progress <- shiny::Progress$new()
       progress$set(message = "Preprocessing ...", value = 0)
-      preprocessed_text <- preprocessSemiRedundant(char = sequence(),
-                                      vocabulary = c("\n", "a", "c", "g", "t"), maxlen = maxlen)
-
-      #generate hdf5 file with state information
+      if (sample == ""){
+        progress$set(message = "Computing states ...", value = 1)
+        states <-
+          getStatesFromFasta(paste0("data/model/", input$selectinput_model),
+                    fasta.path = fasta.path,
+                    maxlen = maxlen,
+                    batch.size = batch.size)
+        on.exit(progress$close())
+        states
+      }
+      else{
+      preprocessed_text <- preprocessSemiRedundant(char = sequence(), 
+                                                   maxlen = maxlen, 
+                                                   vocabulary = c("n","a","g","c","t"))
       progress$set(message = "Computing states ...", value = 1)
-
         states <-
         getStates(paste0("data/model/", input$selectinput_model),
                   preprocessed_text$X,
-                  type = "csv")
-      on.exit(progress$close())
+                  maxlen = maxlen)
+      on.exit(progress$close())}
+      states
     } else {
       req(input$selectinput_states)
       progress <- shiny::Progress$new()
@@ -230,8 +237,6 @@ server <- function(input, output, session) {
       states
     }
   })
- ##### Add: the sane with the data from fasta.files #####
-  
   
   ##### Examples ######
   # Load coordinates of CRISPR information if input$selectinput_states
@@ -271,21 +276,21 @@ server <- function(input, output, session) {
   })
   
   # load the annotation information
-  annotation <- reactive({
-    if (isTruthy(input$fileinput_gff)) {
-      progress <- shiny::Progress$new()
-      progress$set(message = "Loading gff file ...", value = 0)
-      gff <- read.gff(input$fileinput_gff$datapath)
-      # filter by direct_repeat
-      gff <- gff[which(gff$type == "direct_repeat"), ]
-      if (nrow(gff) > 0) {
-        gff
-      }
-      on.exit(progress$close())
-    } else {
-      NULL
-    }
-  })
+  # annotation <- reactive({
+  #   if (isTruthy(input$fileinput_gff)) {
+  #     progress <- shiny::Progress$new()
+  #     progress$set(message = "Loading gff file ...", value = 0)
+  #     gff <- read.gff(input$fileinput_gff$datapath)
+  #     # filter by direct_repeat
+  #     gff <- gff[which(gff$type == "direct_repeat"), ]
+  #     if (nrow(gff) > 0) {
+  #       gff
+  #     }
+  #     on.exit(progress$close())
+  #   } else {
+  #     NULL
+  #   }
+  # })
   
   within_repeat_data <- reactive({
     if (!is.null(dataset())) {
@@ -363,13 +368,11 @@ server <- function(input, output, session) {
     dat <- within_repeat_data()
     DT::datatable(dat)
   })
-
   
   output$plot1 <- renderPlot({
     dat <- as.data.frame(within_repeat_data())
     p <- ggplot(dat, aes(x = repeat_responses, y = non_repeat_responses, size=diff)) + geom_point()
-    print(p)
-  }, height = 700)
+    print(p)}, height = 700)
 
 }
 # Run the application

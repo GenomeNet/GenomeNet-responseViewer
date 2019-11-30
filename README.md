@@ -23,3 +23,8 @@ Please enter a genomic sequence (nucleotides) in the input area or upload a .fas
 
 ![Web app](www/figure.png)
 
+Example:
+visualizePrediction(strrep("ATGTAGTAGTAGTAGTAGATGATGATAGATGCACACACAGATACATAGCATGCTGCT",1000)) 
+Used model: exanple_model.hdf5
+![Web app](www/figure1.png)
+
