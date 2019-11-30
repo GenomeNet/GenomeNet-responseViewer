@@ -11,10 +11,8 @@ If you using RStudio you can run this application on a local computer. It requir
 
 ## Running GenomeNet-responseViewer
 
-To run GenomeNet-responseViewer please start it as a R shiny server and point your browser to  [localhost:6681](http://http://localhost:6681). You may need to change the port dependent on your shiny installation. 
-
 ```bash
-runApp()
+visualizePrediction()
 ```
 
 ## Usage
