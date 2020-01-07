@@ -6,7 +6,7 @@ GenomeNet-responseViewer is an open-source interactive web app for visualising h
 
 ## Installation
 
-If you using RStudio you can run this application on a local computer. It requires the R packages `Biostrings`, `shiny`, `keras`, `h5`, `dygraphs`. The R library `hiddengenome/deepG` needs to be installed as it provides the main function of hidden state extraction. 
+It requires the R packages `Biostrings`, `shiny`, `keras`, `h5`, `dygraphs`. The R library `hiddengenome/deepG` needs to be installed as it provides the main function of hidden state extraction. 
 
 
 ## Running GenomeNet-responseViewer
@@ -22,7 +22,8 @@ Please enter a genomic sequence (nucleotides) in the input area or upload a .fas
 ![Web app](www/figure.png)
 
 Example:
-visualizePrediction(strrep("ATGTAGTAGTAGTAGTAGATGATGATAGATGCACACACAGATACATAGCATGCTGCT",1000)) 
-Used model: exanple_model.hdf5
+```bash
+visualizePrediction(strrep("ATGTAGTAGTAGTAGTAGATGATGATAGATGTAGCATGCTGCT",1000))
+```
 ![Web app](www/figure1.png)
 

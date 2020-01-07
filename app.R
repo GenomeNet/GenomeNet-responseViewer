@@ -1,8 +1,4 @@
-######utlis.R - unused functions #####
-
 #' #' Allowing reset of zooming in dygraph
-#' #' @param dygraph
-#' #' @export
 #' dyUnzoom <- function(dygraph) {
 #'   dyPlugin(
 #'     dygraph = dygraph,
@@ -13,16 +9,13 @@
 
 #' 
 #' #' Dygraph
-#' #' @param dygraph
-#' #' @param x
-#' #' @param text
-#' #' @export
 #' presAnnotation <- function(dygraph, x, text) {
 #'   dygraph %>%
 #'     dyAnnotation(x, text, attachAtBottom = TRUE, width = 60, height= 20)
 #' }
-#####utlis.R - used function #####
-#' Dygraph
+
+
+#' Dygraph shading (interesting in terms of coloring interesting places in the genome)
 #' @param dy
 #' @param from
 #' @param to
@@ -31,8 +24,8 @@
 vec_dyShading <- function(dy, from, to, color){
   for (i in seq_along(from)) {
     dy <- dyShading(dy, from = from[i], 
-                    to = to[i]) #,
-                    #color = color[i])
+                    to = to[i])
+                    #,color = color[i])
   }
   dy
 }
@@ -43,37 +36,41 @@ vec_dyShading <- function(dy, from, to, color){
 #' @param nucleotides nucleotides from the genomic sequence
 #' @export
 nucleotide2value <- function(nucleotides){
-  require(plyr) #remove in deepG
+  require(plyr)
   nuc <- unlist(strsplit(nucleotides, "", fixed = TRUE))
   values <- mapvalues(nuc, c("A", "C", "G", "T"), c(0, 0.33, 0.66, 1))
   return(values)
 }
 
 ######Shiny app########
-
 #' This is a Shiny web application for the visualization of hidden states of
 #' LSTM models. Default will show the states from data: GCF_000008365.1_
 #' ASM836v1_genomic and GCF_000006605.1_ASM660v1_genomic. It also comes with 
-#' the possibility to use trained models.
+#' the possibility to use own trained models. The sample is processed before with 
+#' \code{preprocessSemiRedudant()} or a Fasta file with \code{preprocessFasta()}. Then 
+#' the result $x will be used for the functions \code{getStatus()} and 
+#' \code{getStatusfromFasta()}.
 #' 
-#' @param sample  preprocess$x -> getStates
-#' @param model.path path to model
-#' @param maxlen maxlen 
-#' @param batch.size batch.size
-#' @param fasta.path path to fasta files -> preprocessFasta -> getStatesfromFasta
+#' @param sample  character input string of text
+#' @param model.path path to trained model, default "data/models"
+#' @param maxlen length of one sample
+#' @param batch.size number of samples
+#' @param fasta.path path to fasta files, default "data/fasta"
 #' @param vocabulary used vocabulary
 #' @example 
 #' \dontrun{
-#' visualizePrediction(strrep("ATGTAGTAGTAGTAGTAGATGATGATAGATGCACACACAGATACATAGCATGCTGCT",1000))}
+#' visualizePrediction(strrep("ATGTAGTAGTAGTAGTAGATGATGATAGATGCACACACAGATACATAGCATGCTGCT",1000))
+#' visualizePrediction(strrep("ATGTAGTAGTAGT",1000))
+#' visualizePrediction(fasta.path = "data/fasta/a.fasta") # all with example_model_cpu_new_full_model.hdf5}
 #' @export
 visualizePrediction <- function(sample = "",
                                 model.path = "",
-                                maxlen = 30,
-                                fasta.path = "example_files/fasta",
+                                fasta.path = "",
+                                maxlen = 80,
                                 batch.size = 100,
-                                vocabulary = ""){
+                                vocabulary = c("l","p","a","g","c","t")){
 
-library(shiny) #remove in deepG
+library(shiny)
 library(shinythemes)
 library(Biostrings)
 library(readr)
@@ -92,7 +89,7 @@ library(ape)
 ui <- fluidPage(theme = shinytheme("sandstone"),
                 
                 # Application title
-                titlePanel("GenomeNet - deepG"),
+                titlePanel("Response viewer for the GenomeNet", windowTitle = 'GenomeNet'),
                 # Inputs -------------------------------------------------------
                 # Sidebar
                 sidebarLayout(
@@ -100,19 +97,19 @@ ui <- fluidPage(theme = shinytheme("sandstone"),
                     selectInput(
                       "selectinput_dataset",
                       "Dataset:",
-                      c("calculated hidden states","examples")),
+                      c("Calculated hidden states","Examples")),
                     
                     if (model.path == "")
                     {conditionalPanel(
-                      condition = "input.selectinput_dataset == 'calculated hidden states'",
+                      condition = "input.selectinput_dataset == 'Calculated hidden states'",
                       selectInput('selectinput_model', 'Select model:',
-                                  choice = c(list.files('data/model/'))))},
+                                  choice = c(list.files('data/models/'))))},
                     
                     conditionalPanel(
-                      condition = "input.selectinput_dataset == 'examples'",
+                      condition = "input.selectinput_dataset == 'Examples'",
                       selectInput(
                         'selectinput_states',
-                        'Select precalculated cell response:',
+                        'Select example for the Cell Response:',
                         choice = list.files('data/ncbi_data/states/'))),
                     
                     tags$hr(),
@@ -122,39 +119,42 @@ ui <- fluidPage(theme = shinytheme("sandstone"),
                       selected = 1,
                       choices = 1:125 ,
                       multiple = TRUE),
-                    numericInput(
+                    sliderInput(
                       "numericInput_start",
                       "Start position:",
-                      800,
+                      value = 800,
                       min = 1,
                       max = 4000),
-                    numericInput(
+                    sliderInput(
                       "numericInput_end",
                       "End position:",
-                      1500,
+                      value = 1500,
                       min = 1,
-                      max = 4000)),
+                      max = 4000),
+                      tags$p(tags$b("GenomeNet:"),
+                         "For deep neural LSTM networks and their response for genomic modeling "),
+                      tags$a("Please see our Wiki", href="https://hiddengenome.github.io/deepG/")),
                   # Output -----------------------------------------------------
                   mainPanel(tabsetPanel(
-                    tabPanel("Position:", 
+                    tabPanel("Cell Response:", 
                              dygraphOutput("dygraph"), 
                              dygraphOutput("dygraph2", height = 50)),
                     tabPanel("Correlation:",
                       pairsD3Output("pairs",
                                     width = "80%",
                                     height = 1200)),
-                    tabPanel("Repeat-Responses:",
+                    tabPanel("Correlation from the Repeat-Responses:",
                       DT::dataTableOutput("table1")),
                     
-                    tabPanel("Repeat-Responses-Graph:",
+                    tabPanel("Repeat-Response-Graph:",
                              plotOutput("plot1"))
                   ))
                 ))
 # SERVER -----------------------------------------------------------------------
 server <- function(input, output, session) {
-  
+
   sequence  <- reactive({
-    if (input$selectinput_dataset == "calculated hidden states") {
+    if (input$selectinput_dataset == "Calculated hidden states") {
       if (sample == "") 
         {output <- fasta.path}
       else 
@@ -169,20 +169,30 @@ server <- function(input, output, session) {
   # get the hidden states of the input sequence
   dataset <- reactive({
     req(input$selectinput_dataset)
-    if (input$selectinput_dataset == "calculated hidden states"){
+    if (input$selectinput_dataset == "Calculated hidden states"){
       req(sequence())
       progress <- shiny::Progress$new()
-      progress$set(message = "Preprocessing ...", value = 0)
+      progress$set(message = "Preprocessing ...", value = 1)
+      on.exit(progress$close())
       if (sample == ""){
         if(model.path == ""){
+        progress <- shiny::Progress$new()
         progress$set(message = "Computing states ...", value = 1)
-        states <-
-          getStatesFromFasta(paste0("data/model/", input$selectinput_model),
-                    fasta.path = fasta.path,
-                    maxlen = maxlen,
-                    batch.size = batch.size)
+        
+        # states <-
+        #   getStatesFromFasta(paste0("data/models/", input$selectinput_model),
+        #             fasta.path = fasta.path,
+        #             maxlen = maxlen,
+        #             batch.size = batch.size)
+          
+         preprocessedfasta <- preprocessFasta(path = fasta.path, maxlen = maxlen,vocabulary = vocabulary)
+         states <- getStates(model.path = paste0("data/models/", input$selectinput_model),
+                    preprocessedfasta$X,
+                    maxlen = maxlen)
+          
         on.exit(progress$close())}
         else{
+          progress <- shiny::Progress$new()
           progress$set(message = "Computing states ...", value = 1)
           states <-
             getStatesFromFasta(model.path,
@@ -197,17 +207,19 @@ server <- function(input, output, session) {
         if (model.path == ""){
           preprocessed_text <- preprocessSemiRedundant(char = sequence(), 
                                                    maxlen = maxlen, 
-                                                   vocabulary = c("\n","a","g","c","t"))
+                                                   vocabulary = vocabulary)
+          progress <- shiny::Progress$new()
           progress$set(message = "Computing states ...", value = 1)
           states <-
-          getStates(paste0("data/model/", input$selectinput_model),
+          getStates(paste0("data/models/", input$selectinput_model),
                   preprocessed_text$X,
                   maxlen = maxlen)
           on.exit(progress$close())} 
         else{
           preprocessed_text <- preprocessSemiRedundant(char = sequence(), 
                                                        maxlen = maxlen, 
-                                                       vocabulary = c("\n","a","g","c","t"))
+                                                       vocabulary = vocabulary)
+          progress <- shiny::Progress$new()
           progress$set(message = "Computing states ...", value = 1)
           states <-
             getStates(model.path = model.path,
@@ -225,8 +237,7 @@ server <- function(input, output, session) {
           paste0("data/ncbi_data/states/", input$selectinput_states),
           header = F,
           stringsAsFactors = F,
-          sep = ";"
-        )
+          sep = ";")
       on.exit(progress$close())
       states
     }
@@ -303,6 +314,7 @@ server <- function(input, output, session) {
  
     # load nucleotide text
     genome <- read_lines(paste0("data/ncbi_data/genome/", input$selectinput_states))
+    
     ribbonData <- nucleotide2value(genome)
   
     dy <- dygraph(cell_df, group = "a") %>%
@@ -336,7 +348,7 @@ server <- function(input, output, session) {
       opacity = 0.5,
       leftmar = 10,
       topmar = 0,
-      width = 900
+      width = 750
     )
   })
   
