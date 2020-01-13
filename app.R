@@ -1,13 +1,3 @@
-#' #' Allowing reset of zooming in dygraph
-#' dyUnzoom <- function(dygraph) {
-#'   dyPlugin(
-#'     dygraph = dygraph,
-#'     name = "Unzoom",
-#'     path = system.file("plugins/unzoom.js", package = "dygraphs")
-#'   )
-#' }
-
-#' 
 #' #' Dygraph
 #' presAnnotation <- function(dygraph, x, text) {
 #'   dygraph %>%
@@ -60,13 +50,17 @@ nucleotide2value <- function(nucleotides){
 #' @example 
 #' \dontrun{
 #' visualizePrediction(strrep("ATGTAGTAGTAGTAGTAGATGATGATAGATGCACACACAGATACATAGCATGCTGCT",1000))
+#' visualizePrediction(strrep("ATGTAGTAGTAGT",1000), model.path = "data/models/cpu_model.hdf5", maxlen = 50, vocabulary = c("l","a","g","c","t"))
 #' visualizePrediction(strrep("ATGTAGTAGTAGT",1000))
+#' visualizePrediction(paste(c(rep("ATGTAGTAGTAGTAGTAGATGATGATAGATGCACACACAGATACATAGCATGCTGCT",500), rep("TGTGTGTGTGCCCAGTACGATCAGTAGTAGGACAGAGACGAG",500)), collapse = ""))
 #' visualizePrediction(fasta.path = "data/fasta/a.fasta") # all with example_model_cpu_new_full_model.hdf5}
 #' @export
 visualizePrediction <- function(sample = "",
-                                model.path = "",
+                                model.path = "data/models/example_model_cpu_new_full_model.hdf5",
                                 fasta.path = "",
                                 maxlen = 80,
+                                start_position = 800,
+                                end_position = 1500,
                                 batch.size = 100,
                                 vocabulary = c("l","p","a","g","c","t")){
 
@@ -86,75 +80,61 @@ library(ape)
 
 # Generate the user interface
 # UI ---------------------------------------------------------------------------
-ui <- fluidPage(theme = shinytheme("sandstone"),
+ui <- fluidPage(theme = shinytheme("flatly"),
                 
                 # Application title
                 titlePanel("Response viewer for the GenomeNet", windowTitle = 'GenomeNet'),
                 # Inputs -------------------------------------------------------
                 # Sidebar
-                sidebarLayout(
-                  sidebarPanel(
-                    selectInput(
+               # sidebarLayout(
+                #  sidebarPanel(
+                
+                tags$p(tags$b("GenomeNet:"),
+                      "For deep neural LSTM networks and their response for genomic modeling, please see our", 
+                      tags$a("Wiki", href="https://hiddengenome.github.io/deepG/")),
+                   
+
+                  selectInput(
                       "selectinput_dataset",
                       "Dataset:",
-                      c("Calculated hidden states","Examples")),
-                    
-                    if (model.path == "")
-                    {conditionalPanel(
-                      condition = "input.selectinput_dataset == 'Calculated hidden states'",
-                      selectInput('selectinput_model', 'Select model:',
-                                  choice = c(list.files('data/models/'))))},
+                      c("Calculated Response","Examples"), width = "45%"),
                     
                     conditionalPanel(
                       condition = "input.selectinput_dataset == 'Examples'",
                       selectInput(
                         'selectinput_states',
                         'Select example for the Cell Response:',
-                        choice = list.files('data/ncbi_data/states/'))),
+                        choice = list.files('data/ncbi_data/states/'), width = "45%")), 
                     
-                    tags$hr(),
                     selectInput(
                       "selectinput_cell",
                       "Cell number(s):",
                       selected = 1,
                       choices = 1:125 ,
-                      multiple = TRUE),
-                    sliderInput(
-                      "numericInput_start",
-                      "Start position:",
-                      value = 800,
-                      min = 1,
-                      max = 4000),
-                    sliderInput(
-                      "numericInput_end",
-                      "End position:",
-                      value = 1500,
-                      min = 1,
-                      max = 4000),
-                      tags$p(tags$b("GenomeNet:"),
-                         "For deep neural LSTM networks and their response for genomic modeling "),
-                      tags$a("Please see our Wiki", href="https://hiddengenome.github.io/deepG/")),
+                      multiple = TRUE, width = "45%"),
+
                   # Output -----------------------------------------------------
-                  mainPanel(tabsetPanel(
-                    tabPanel("Cell Response:", 
-                             dygraphOutput("dygraph"), 
-                             dygraphOutput("dygraph2", height = 50)),
+                  
+                tabsetPanel(tabPanel(
+                    "Cell Response:", 
+                              dygraphOutput("dygraph"), 
+                              dygraphOutput("dygraph2", height = 80)
+                    ),
                     tabPanel("Correlation:",
                       pairsD3Output("pairs",
-                                    width = "80%",
-                                    height = 1200)),
+                                    width = "100%",
+                                    height = 500)),
                     tabPanel("Correlation from the Repeat-Responses:",
                       DT::dataTableOutput("table1")),
-                    
+
                     tabPanel("Repeat-Response-Graph:",
                              plotOutput("plot1"))
                   ))
-                ))
 # SERVER -----------------------------------------------------------------------
 server <- function(input, output, session) {
 
   sequence  <- reactive({
-    if (input$selectinput_dataset == "Calculated hidden states") {
+    if (input$selectinput_dataset == "Calculated Response") {
       if (sample == "") 
         {output <- fasta.path}
       else 
@@ -169,53 +149,22 @@ server <- function(input, output, session) {
   # get the hidden states of the input sequence
   dataset <- reactive({
     req(input$selectinput_dataset)
-    if (input$selectinput_dataset == "Calculated hidden states"){
+    if (input$selectinput_dataset == "Calculated Response"){
       req(sequence())
-      progress <- shiny::Progress$new()
-      progress$set(message = "Preprocessing ...", value = 1)
-      on.exit(progress$close())
       if (sample == ""){
-        if(model.path == ""){
-        progress <- shiny::Progress$new()
-        progress$set(message = "Computing states ...", value = 1)
-        
-        # states <-
-        #   getStatesFromFasta(paste0("data/models/", input$selectinput_model),
-        #             fasta.path = fasta.path,
-        #             maxlen = maxlen,
-        #             batch.size = batch.size)
-          
-         preprocessedfasta <- preprocessFasta(path = fasta.path, maxlen = maxlen,vocabulary = vocabulary)
-         states <- getStates(model.path = paste0("data/models/", input$selectinput_model),
-                    preprocessedfasta$X,
-                    maxlen = maxlen)
-          
-        on.exit(progress$close())}
-        else{
           progress <- shiny::Progress$new()
           progress$set(message = "Computing states ...", value = 1)
+          
+          model <- keras::load_model_hdf5(model.path)
           states <-
-            getStatesFromFasta(model.path,
+            getStatesFromFasta(model,
                                fasta.path = fasta.path,
                                maxlen = maxlen,
                                batch.size = batch.size)
           on.exit(progress$close())
-        }
-        states
+          states
       }
       else{
-        if (model.path == ""){
-          preprocessed_text <- preprocessSemiRedundant(char = sequence(), 
-                                                   maxlen = maxlen, 
-                                                   vocabulary = vocabulary)
-          progress <- shiny::Progress$new()
-          progress$set(message = "Computing states ...", value = 1)
-          states <-
-          getStates(paste0("data/models/", input$selectinput_model),
-                  preprocessed_text$X,
-                  maxlen = maxlen)
-          on.exit(progress$close())} 
-        else{
           preprocessed_text <- preprocessSemiRedundant(char = sequence(), 
                                                        maxlen = maxlen, 
                                                        vocabulary = vocabulary)
@@ -226,7 +175,7 @@ server <- function(input, output, session) {
                       preprocessed_text$X,
                       maxlen = maxlen)
           on.exit(progress$close())
-        }}
+        }
       states
     } else {
       req(input$selectinput_states)
@@ -300,11 +249,20 @@ server <- function(input, output, session) {
     states_df <- dataset()[, cell_num]
     cell_df <- data.frame(pos = 1:nrow(dataset()),
                           states_df)
+    
+    dy <- dygraph(cell_df, group = "a", main = "" ) %>%
+      dyLegend(show = "onmouseover", hideOnMouseOut = FALSE)  %>%
+      dyOptions(stepPlot = TRUE) %>% dyRangeSelector(dateWindow = c(start_position, end_position))
+    
+    if (input$selectinput_dataset == "Examples"){
     dy <- dygraph(cell_df, group = "a", main = paste0(taxadata()$taxa)) %>%
       dyLegend(show = "onmouseover", hideOnMouseOut = FALSE)  %>%
-      dyOptions(stepPlot = TRUE) %>% dyRangeSelector(dateWindow = c(input$numericInput_start, input$numericInput_end))
+      dyOptions(stepPlot = TRUE) %>% dyRangeSelector(dateWindow = c(start_position, end_position))}
+    
     if (!is.null(metadata()))
-      dy <- vec_dyShading(dy, metadata()$from, metadata()$to, metadata()$color)
+      if (input$selectinput_dataset == "Examples"){
+      dy <- vec_dyShading(dy, metadata()$from, metadata()$to, metadata()$color)}
+      dy <- dyUnzoom(dy) 
     dy    
   })
   
@@ -319,9 +277,7 @@ server <- function(input, output, session) {
   
     dy <- dygraph(cell_df, group = "a") %>%
       dyRibbon(data = ribbonData, top = 1, bottom = 0, palette=c("red", "blue", "green", "yellow"))
-               # A = red, t = blue, c = green, c = orange
-    if (!is.null(metadata()))
-      dy <- vec_dyShading(dy, metadata()$from, metadata()$to, metadata()$color)
+               # A = red, c = blue, g = green, t = yellow
     dy    
   })
   
@@ -360,7 +316,7 @@ server <- function(input, output, session) {
   output$plot1 <- renderPlot({
     dat <- as.data.frame(within_repeat_data())
     p <- ggplot(dat, aes(x = repeat_responses, y = non_repeat_responses, color = diff, size = diff)) + geom_point()
-    print(p)}, height = 700) 
+    print(p)}, height = 500) 
 
 }
 # Run the application
