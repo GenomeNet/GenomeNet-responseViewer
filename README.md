@@ -11,12 +11,12 @@ It requires the various R packages, like `Biostrings`, `shiny`, `keras`, `h5`, `
 To install deepG use:
 
 ```bash
-devtools::install_github("hiddegenome/deepG")
+devtools::install_github("hiddengenome/deepG")
 ```
 
 To install the GenomeNet-ResponseViewer use:
 ```bash
-devtools::install_github("hiddegenome/GenomeNet-ResponseViewer")
+devtools::install_github("hiddengenome/GenomeNet-ResponseViewer")
 ```
 
 Or download the Zip-File and extract that file. 
