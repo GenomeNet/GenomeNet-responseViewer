@@ -14,17 +14,24 @@ To install deepG use:
 devtools::install_github("hiddengenome/deepG")
 ```
 
+Make sure you have the `keras` version: 2.2.5.0 and `tensorflow` 2.0.0. Same models only working with GPU support. On default, Keras will be installed without GPU support. To support GPUs reinstall Keras via
+
+```bash
+keras::install_keras(tensorflow = "gpu")
+```
+
 To install the GenomeNet-ResponseViewer use:
 ```bash
 devtools::install_github("hiddengenome/GenomeNet-ResponseViewer")
 ```
-
-Or download the Zip-File and extract that file. 
+Or download the Zip-File and extract the files. Choose the directory and enter  
+```bash
+source("app.R")
+```
 
 ## Running GenomeNet-responseViewer
 
 ```bash
-source("app.R")
 visualizePrediction()
 ```
 
