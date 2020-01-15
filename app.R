@@ -1,28 +1,25 @@
-#' #' Dygraph
+#' Dygraph shading to color interesting places in the genome
+#' 
+#' Note: For Annotation use:
 #' presAnnotation <- function(dygraph, x, text) {
 #'   dygraph %>%
 #'     dyAnnotation(x, text, attachAtBottom = TRUE, width = 60, height= 20)
 #' }
-
-
-#' Dygraph shading (interesting in terms of coloring interesting places in the genome)
-#' @param dy
-#' @param from
-#' @param to
-#' @param color
+#' @param dy the dygraph
+#' @param from begin from the shading
+#' @param to end from the shading
+#' @param color color 
 #' @export
-vec_dyShading <- function(dy, from, to, color){
+vec_dyShading <- function(dy, from, to, colour){
   for (i in seq_along(from)) {
     dy <- dyShading(dy, from = from[i], 
-                    to = to[i])
-                    #,color = color[i])
+                    to = to[i],
+                    colour = colour) #for different colours colors[i]
   }
   dy
 }
 
 #' Change nucleotides to values
-#' 
-#' A has the value 0, C 0.33, G 0.66 and T 1
 #' @param nucleotides nucleotides from the genomic sequence
 #' @export
 nucleotide2value <- function(nucleotides){
@@ -32,37 +29,39 @@ nucleotide2value <- function(nucleotides){
   return(values)
 }
 
-######Shiny app########
+# Shiny app --------------------------------------------------------------------
+
 #' This is a Shiny web application for the visualization of hidden states of
-#' LSTM models. Default will show the states from data: GCF_000008365.1_
+#' LSTM models from the package deepG. Examples are the states from GCF_000008365.1_
 #' ASM836v1_genomic and GCF_000006605.1_ASM660v1_genomic. It also comes with 
-#' the possibility to use own trained models. The sample is processed before with 
-#' \code{preprocessSemiRedudant()} or a Fasta file with \code{preprocessFasta()}. Then 
-#' the result $x will be used for the functions \code{getStatus()} and 
-#' \code{getStatusfromFasta()}.
+#' the possibility to use own trained models. The sample is preprocessed with 
+#' \code{preprocessSemiRedudant()} and the states are calculated with \code{getStatus()}.
 #' 
-#' @param sample  character input string of text
+#' @param sample character input string of text
+#' @param fasta.path path to fasta files
 #' @param model.path path to trained model, default "data/models"
-#' @param maxlen length of one sample
+#' @param genome used genome
+#' @param taxadata data from the used genome (name, taxon)
+#' @param metadata data from the used genome (CRISPR regions)
+#' @param states load calculated states to visualize them
+#' @param start_position start from the dygraph
+#' @param end_position end from the dygraph
 #' @param batch.size number of samples
-#' @param fasta.path path to fasta files, default "data/fasta"
 #' @param vocabulary used vocabulary
-#' @example 
-#' \dontrun{
-#' visualizePrediction(strrep("ATGTAGTAGTAGTAGTAGATGATGATAGATGCACACACAGATACATAGCATGCTGCT",1000))
-#' visualizePrediction(strrep("ATGTAGTAGTAGT",1000), model.path = "data/models/cpu_model.hdf5", maxlen = 50, vocabulary = c("l","a","g","c","t"))
-#' visualizePrediction(strrep("ATGTAGTAGTAGT",1000))
-#' visualizePrediction(paste(c(rep("ATGTAGTAGTAGTAGTAGATGATGATAGATGCACACACAGATACATAGCATGCTGCT",500), rep("TGTGTGTGTGCCCAGTACGATCAGTAGTAGGACAGAGACGAG",500)), collapse = ""))
-#' visualizePrediction(fasta.path = "data/fasta/a.fasta") # all with example_model_cpu_new_full_model.hdf5}
+#' @param cell_number cell_number showed in the dygraph
 #' @export
 visualizePrediction <- function(sample = "",
-                                model.path = "data/models/example_model_cpu_new_full_model.hdf5",
                                 fasta.path = "",
-                                maxlen = 80,
+                                model.path = "data/models/example_model_cpu_new_full_model.hdf5",
+                                genome = "",
+                                taxadata = "",
+                                metadata = "",
+                                states = "",
                                 start_position = 800,
                                 end_position = 1500,
-                                batch.size = 100,
-                                vocabulary = c("l","p","a","g","c","t")){
+                                batch.size = 200,
+                                vocabulary = c("l","p","a","g","c","t"),
+                                cell_number = 1){
 
 library(shiny)
 library(shinythemes)
@@ -78,109 +77,101 @@ library(ggplot2)
 library(dygraphs)
 library(ape)
 
-# Generate the user interface
-# UI ---------------------------------------------------------------------------
+# UI (User inferace) -----------------------------------------------------------
 ui <- fluidPage(theme = shinytheme("flatly"),
                 
-                # Application title
-                titlePanel("Response viewer for the GenomeNet", windowTitle = 'GenomeNet'),
-                # Inputs -------------------------------------------------------
-                # Sidebar
-               # sidebarLayout(
-                #  sidebarPanel(
+                # Application title --------------------------------------------
+                titlePanel("Response Viewer from deepG", windowTitle = 'GenomeNet'),
                 
+                # Inputs -------------------------------------------------------
                 tags$p(tags$b("GenomeNet:"),
-                      "For deep neural LSTM networks and their response for genomic modeling, please see our", 
-                      tags$a("Wiki", href="https://hiddengenome.github.io/deepG/")),
+                    "For training deep neural LSTM networks for genomic modeling and visualising their hidden states,
+                    please see our", tags$a("Wiki", href="https://github.com/hiddengenome/deepG/wiki"), "for help."),
                    
-
-                  selectInput(
-                      "selectinput_dataset",
-                      "Dataset:",
-                      c("Calculated Response","Examples"), width = "45%"),
+                selectInput(
+                    "selectinput_dataset",
+                    "Dataset:",
+                    c("Calculated Response","Examples"), width = "45%"),
                     
-                    conditionalPanel(
-                      condition = "input.selectinput_dataset == 'Examples'",
-                      selectInput(
+                conditionalPanel(
+                    condition = "input.selectinput_dataset == 'Examples'",
+                    selectInput(
                         'selectinput_states',
                         'Select example for the Cell Response:',
-                        choice = list.files('data/ncbi_data/states/'), width = "45%")), 
+                        choice = list.files('data/ncbi_data/genome/'), width = "45%")), 
                     
-                    selectInput(
-                      "selectinput_cell",
-                      "Cell number(s):",
-                      selected = 1,
-                      choices = 1:125 ,
-                      multiple = TRUE, width = "45%"),
+                selectInput(
+                    "selectinput_cell",
+                    "Cell number(s):",
+                    selected = cell_number,
+                    choices = 1:125 ,
+                    multiple = TRUE, 
+                    width = "45%"),
 
-                  # Output -----------------------------------------------------
-                  
+                # Output -------------------------------------------------------
                 tabsetPanel(tabPanel(
                     "Cell Response:", 
-                              dygraphOutput("dygraph"), 
-                              dygraphOutput("dygraph2", height = 80)
-                    ),
-                    tabPanel("Correlation:",
-                      pairsD3Output("pairs",
-                                    width = "100%",
-                                    height = 500)),
-                    tabPanel("Correlation from the Repeat-Responses:",
-                      DT::dataTableOutput("table1")),
+                    dygraphOutput("dygraph"), 
+                    dygraphOutput("dygraph2", height = 80)),
+                    
+                tabPanel("Correlation:",
+                    pairsD3Output("pairs",
+                    width = "100%",
+                    height = 500)),
+                
+                tabPanel("Correlation from the Repeat-Responses:",
+                    DT::dataTableOutput("table1")),
 
-                    tabPanel("Repeat-Response-Graph:",
-                             plotOutput("plot1"))
-                  ))
+                tabPanel("Repeat-Response-Graph:",
+                    plotOutput("plot1"))))
 # SERVER -----------------------------------------------------------------------
 server <- function(input, output, session) {
 
+  # load maxlen from the model
+  model <- keras::load_model_hdf5(model.path) 
+  maxlen <- model$input$shape[1] 
+  
+  # generate sequence from the sample 
   sequence  <- reactive({
     if (input$selectinput_dataset == "Calculated Response") {
       if (sample == "") 
         {output <- fasta.path}
       else 
         {output <- sample}
-      output
-    }
-    else {
-      NULL
-    }
+      output}
+    else {NULL}
   })
 
-  # get the hidden states of the input sequence
+  # get the hidden states of the input sequence with getStates 
   dataset <- reactive({
     req(input$selectinput_dataset)
     if (input$selectinput_dataset == "Calculated Response"){
       req(sequence())
       if (sample == ""){
-          progress <- shiny::Progress$new()
-          progress$set(message = "Computing states ...", value = 1)
+        progress <- shiny::Progress$new()
+        progress$set(message = "Preprocessing fasta file and computing states ...", value = 1)
           
-          model <- keras::load_model_hdf5(model.path)
-          states <-
-            getStatesFromFasta(model,
-                               fasta.path = fasta.path,
-                               maxlen = maxlen,
-                               batch.size = batch.size)
-          on.exit(progress$close())
-          states
-      }
+        states <- getStatesFromFasta(model,
+                                     fasta.path = fasta.path,
+                                     maxlen = maxlen,
+                                     batch.size = batch.size)
+        on.exit(progress$close())
+        states}
       else{
-          preprocessed_text <- preprocessSemiRedundant(char = sequence(), 
-                                                       maxlen = maxlen, 
-                                                       vocabulary = vocabulary)
-          progress <- shiny::Progress$new()
-          progress$set(message = "Computing states ...", value = 1)
-          states <-
-            getStates(model.path = model.path,
-                      preprocessed_text$X,
-                      maxlen = maxlen)
-          on.exit(progress$close())
-        }
-      states
-    } else {
+        preprocessed_text <- preprocessSemiRedundant(char = sequence(), 
+                                                     maxlen = maxlen, 
+                                                     vocabulary = vocabulary)
+        progress <- shiny::Progress$new()
+        progress$set(message = "Preprocessing and computing states ...", value = 1)
+        states <-getStates(model.path = model.path,
+                           preprocessed_text$X,
+                           maxlen = maxlen)
+        on.exit(progress$close())}
+      states} 
+    else {
       req(input$selectinput_states)
       progress <- shiny::Progress$new()
-      progress$set(message = "Loading states ...", value = 1)
+      progress$set(message = "Loading states from the examples ...", value = 1)
       states <-
         read.table(
           paste0("data/ncbi_data/states/", input$selectinput_states),
@@ -188,14 +179,11 @@ server <- function(input, output, session) {
           stringsAsFactors = F,
           sep = ";")
       on.exit(progress$close())
-      states
-    }
+      states}
   })
   
-  ##### Examples ######
-  # Load coordinates of CRISPR information if input$selectinput_states
+  # Load coordinates of CRISPR information from the examples
   metadata <- reactive({
-    # todo: check if file exists
     req(input$selectinput_states)
     progress <- shiny::Progress$new()
     progress$set(message = "Loading array annotation ...", value = 1)
@@ -211,7 +199,7 @@ server <- function(input, output, session) {
     metadata
   })
   
-  # Load coordinates of CRISPR information if input$selectinput_states
+  # Load nate of the genome
   taxadata <- reactive({
     req(input$selectinput_states)
     progress <- shiny::Progress$new()
@@ -227,13 +215,14 @@ server <- function(input, output, session) {
     taxadata
   })
   
+  # Create data with the repeat responses for the table and the plot 
   within_repeat_data <- reactive({
     if (!is.null(dataset())) {
       responses <- dataset()
       datalist = list()
       for (i in 1:nrow(metadata())) {
-        datalist[[i]] <- metadata()[i,1]:metadata()[i,2]
-      }
+        datalist[[i]] <- metadata()[i,1]:metadata()[i,2]}
+      
       repeat_posistions <- do.call(c, datalist)
       repeat_responses <- colMeans(responses[repeat_posistions,])
       non_repeat_responses <- colMeans(responses[-repeat_posistions,])
@@ -243,25 +232,27 @@ server <- function(input, output, session) {
     }
   })
   
-  #### Plotting #####
+  # Plotting -------------------------------------------------------------------
   output$dygraph <- renderDygraph({
     cell_num <- as.numeric(input$selectinput_cell)
     states_df <- dataset()[, cell_num]
-    cell_df <- data.frame(pos = 1:nrow(dataset()),
-                          states_df)
+    cell_df <- data.frame(pos = 1:nrow(dataset()), states_df)
+    
+    
+    if (input$selectinput_dataset == "Examples"){
+      dy <- dygraph(cell_df, group = "a", main = paste0(taxadata()$taxa)) %>%
+        dyLegend(show = "onmouseover", hideOnMouseOut = FALSE)  %>%
+        dyOptions(stepPlot = TRUE) %>% dyRangeSelector(dateWindow = c(start_position, end_position))}
     
     dy <- dygraph(cell_df, group = "a", main = "" ) %>%
       dyLegend(show = "onmouseover", hideOnMouseOut = FALSE)  %>%
       dyOptions(stepPlot = TRUE) %>% dyRangeSelector(dateWindow = c(start_position, end_position))
     
-    if (input$selectinput_dataset == "Examples"){
-    dy <- dygraph(cell_df, group = "a", main = paste0(taxadata()$taxa)) %>%
-      dyLegend(show = "onmouseover", hideOnMouseOut = FALSE)  %>%
-      dyOptions(stepPlot = TRUE) %>% dyRangeSelector(dateWindow = c(start_position, end_position))}
-    
     if (!is.null(metadata()))
       if (input$selectinput_dataset == "Examples"){
-      dy <- vec_dyShading(dy, metadata()$from, metadata()$to, metadata()$color)}
+      dy <- vec_dyShading(dy, metadata()$from, metadata()$to, "lightgrey")} 
+      # color in the metadata then metadata()$color
+      # presAnnotation for annotation in the dygraph
       dy <- dyUnzoom(dy) 
     dy    
   })
@@ -269,29 +260,25 @@ server <- function(input, output, session) {
   output$dygraph2 <- renderDygraph({
     cell_df <- data.frame(pos = 1:nrow(dataset()),
                           rep(0,nrow(dataset())))
- 
-    # load nucleotide text
     genome <- read_lines(paste0("data/ncbi_data/genome/", input$selectinput_states))
-    
-    ribbonData <- nucleotide2value(genome)
+    ribbonData <- nucleotide2value(genome) # nucleotides into values [A = 0; C = 0.33; G = 0.66: T = 1]
   
     dy <- dygraph(cell_df, group = "a") %>%
-      dyRibbon(data = ribbonData, top = 1, bottom = 0, palette=c("red", "blue", "green", "yellow"))
-               # A = red, c = blue, g = green, t = yellow
+      dyRibbon(data = ribbonData, top = 1, bottom = 0, palette=c("yellow", "red", "green", "blue"))
+      # [A = yellow; C = red; G = green: T = blue]
     dy    
   })
   
   output$pairs <- renderPairsD3({
     cell_num <- as.numeric(input$selectinput_cell)
     states_df <- dataset()[, cell_num]
-    cell_df <- data.frame(pos = 1:nrow(dataset()),
-                          states_df)
+    cell_df <- data.frame(pos = 1:nrow(dataset()), states_df)
     
     # get the positions of repeat
     datalist = list()
     for (i in 1:nrow(metadata())) {
-      datalist[[i]] <- metadata()[i,1]:metadata()[i,2]
-    }
+      datalist[[i]] <- metadata()[i,1]:metadata()[i,2]}
+    
     repeat_posistions <- do.call(c, datalist)
     is_crispr <- rep("A", nrow(cell_df))
     is_crispr[repeat_posistions] <- "B"
@@ -315,9 +302,8 @@ server <- function(input, output, session) {
   
   output$plot1 <- renderPlot({
     dat <- as.data.frame(within_repeat_data())
-    p <- ggplot(dat, aes(x = repeat_responses, y = non_repeat_responses, color = diff, size = diff)) + geom_point()
+    p <- ggplot(dat, aes(x = repeat_responses, y = non_repeat_responses, color = diff)) + geom_point()
     print(p)}, height = 500) 
-
-}
-# Run the application
+  }
+# Run the application ----------------------------------------------------------
 shinyApp(ui = ui, server = server)}
