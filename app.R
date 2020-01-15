@@ -14,7 +14,7 @@ vec_dyShading <- function(dy, from, to, colour){
   for (i in seq_along(from)) {
     dy <- dyShading(dy, from = from[i], 
                     to = to[i],
-                    colour = colour) #for different colours colors[i]
+                    color = colour) #for different colours colors[i]
   }
   dy
 }
