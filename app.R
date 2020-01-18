@@ -48,6 +48,7 @@ nucleotide2value <- function(nucleotides){
 #' @param end_position end from the dygraph
 #' @param batch.size number of samples
 #' @param vocabulary used vocabulary
+#' @param show_correlation when false it does not show the information about the correlation 
 #' @param cell_number cell_number showed in the dygraph
 #' @export
 visualizePrediction <- function(sample = "",
@@ -61,6 +62,7 @@ visualizePrediction <- function(sample = "",
                                 end_position = 1500,
                                 batch.size = 200,
                                 vocabulary = c("l","p","a","g","c","t"),
+                                show_correlation = ""
                                 cell_number = 1){
 
 library(shiny)
@@ -238,16 +240,16 @@ server <- function(input, output, session) {
     states_df <- dataset()[, cell_num]
     cell_df <- data.frame(pos = 1:nrow(dataset()), states_df)
     
+    dy <- dygraph(cell_df, group = "a", main = "" ) %>%
+      dyLegend(show = "onmouseover", hideOnMouseOut = FALSE)  %>%
+      dyOptions(stepPlot = TRUE) %>% dyRangeSelector(dateWindow = c(start_position, end_position))
+    
     
     if (input$selectinput_dataset == "Examples"){
       dy <- dygraph(cell_df, group = "a", main = paste0(taxadata()$taxa)) %>%
         dyLegend(show = "onmouseover", hideOnMouseOut = FALSE)  %>%
         dyOptions(stepPlot = TRUE) %>% dyRangeSelector(dateWindow = c(start_position, end_position))}
-    
-    dy <- dygraph(cell_df, group = "a", main = "" ) %>%
-      dyLegend(show = "onmouseover", hideOnMouseOut = FALSE)  %>%
-      dyOptions(stepPlot = TRUE) %>% dyRangeSelector(dateWindow = c(start_position, end_position))
-    
+
     if (!is.null(metadata()))
       if (input$selectinput_dataset == "Examples"){
       dy <- vec_dyShading(dy, metadata()$from, metadata()$to, "lightgrey")} 
