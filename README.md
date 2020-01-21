@@ -11,46 +11,55 @@ It requires the various R packages, like `Biostrings`, `shiny`, `keras`, `h5`, `
 To install deepG use:
 
 ```bash
-devtools::install_github("hiddegenome/deepG")
+devtools::install_github("hiddengenome/deepG")
+```
+
+Make sure you have the `keras` version: 2.2.5.0 and `tensorflow` 2.0.0. Same models only working with GPU support. On default, Keras will be installed without GPU support. To support GPUs reinstall Keras via
+
+```bash
+keras::install_keras(tensorflow = "gpu")
 ```
 
 To install the GenomeNet-ResponseViewer use:
 ```bash
-devtools::install_github("hiddegenome/GenomeNet-ResponseViewer")
+devtools::install_github("hiddengenome/GenomeNet-ResponseViewer")
 ```
-
-Or download the Zip-File and extract that file. 
+Or download the Zip-File and extract the files. Choose the directory and enter  
+```bash
+source("app.R")
+```
 
 ## Running GenomeNet-responseViewer
 
 ```bash
-source("app.R")
 visualizePrediction()
 ```
 
-## Usage & Examples
+## Examples
 
-Please enter a genomic sequence (nucleotides) in the input area or upload a fasta file. Hidden states will be infered using `hiddengenome/deepG` and visualized. You can select different cells and different models. 
+Please enter a genomic sequence (nucleotides) in the input area (or upload a fasta file). Hidden states will be infered using the deepG package and visualized. You can select different cells and different models. Also there are three examples available: The hidden states to "Bacteroides fragilis_CRISPR_example" are calculated with the newest model on CPU. The position of the repeats are colored with grey and you can zoom in and out the graphic.
 
-Calculated example with states in the folder "data/ncbi_data/states2:
-![Web app](www/figure.png)
+** "Bacteroides fragilis_CRISPR_example" **
+Data from the [CRISPRs Database](https://crispr.i2bc.paris-saclay.fr/crispr/)
+![Web app](www/CRISPR_example.png)
 
-And the calculated correlation between two cells:
+![Web app](www/figurea.png)
+![Web app](www/figureb.png)
+
+![Web app](www/correlation.png)
+
+** GCF_000006605.1_ASM660v1_genomic **
 ![Web app](www/figure1.png)
 
-Calculated example with states in the folder "data/ncbi_data/states:
+** GCF_000008365.1_ASM836v1_genomic **
 ![Web app](www/figure2.png)
 
-### Example:
+### Usage:
+
+The parameters `sample`,`model.path`,`start_position`,`end_position`,`batch.size`,`vocabulary` and `cell_number` is currently available, more parameters will be added over the time. An easy example is `visualizePrediction(strrep("ATGCGTA",1000))`
+
 ```bash
-visualizePrediction(sample = read_file("data/CRISPR_Example.txt"), model.path = "data/models/cpu_model.hdf5",  vocabulary = c("l","a","g","c","t"), cell_number = 6)
+visualizePrediction(sample = read_file("data/CRISPR_Example.txt"), model.path = "data/models/cpu_model.hdf5", vocabulary = c("l","a","g","c","t"), cell_number = 6, start_position = 300, end_position = 900)
 ```
 ![Web app](www/figure3.png)
 
-Other examples:
-
-```bash
-visualizePrediction(strrep("ATGCGTA",1000))
-visualizePrediction(strrep("ATGCGTA",1000), model.path = "data/models/cpu_model.hdf5", vocabulary = c("l","a","g","c","t"))
-visualizePrediction(sample = read_file("data/CRISPR_Example_full.txt"))
-```
