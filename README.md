@@ -37,15 +37,13 @@ visualizePrediction()
 
 Please enter a genomic sequence (nucleotides) in the input area (or upload a fasta file). Hidden states will be infered using the deepG package and visualized. You can select different cells and different models. Also there are three examples available: The hidden states to "Bacteroides fragilis_CRISPR_example" are calculated with the newest model on CPU. The position of the repeats are colored with grey and you can zoom in and out the graphic.
 
-**CRISPR Sample from Bacteroides fragilis**
-data from the [CRISPRs Database](https://crispr.i2bc.paris-saclay.fr/crispr/)
+**CRISPR Sample from Bacteroides fragilis** from the [CRISPRs Database](https://crispr.i2bc.paris-saclay.fr/crispr/)
 ![Web app](www/CRISPR_example.png)
 
 ![Web app](www/figure1.png)
 ![Web app](www/figure2.png)
 
-**CRISPR Sample from Lactobacillus acidophilus**
-data from the [CRISPRs Database](https://crispr.i2bc.paris-saclay.fr/crispr/)
+**CRISPR Sample from Lactobacillus acidophilus** from the [CRISPRs Database](https://crispr.i2bc.paris-saclay.fr/crispr/)
 ![Web app](www/Lacto_CRISPR_example.png)
 ![Web app](www/figure3.png)
 
