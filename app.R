@@ -53,16 +53,14 @@ nucleotide2value <- function(nucleotides){
 #' @export
 visualizePrediction <- function(sample = "",
                                 fasta.path = "",
-                                model.path = "data/models/example_model_cpu_new_full_model.hdf5",
-                                genome = "",
-                                taxadata = "",
+                                model.path = "data/models/cpu_model.hdf5",
                                 metadata = "",
-                                states = "",
+                                states_path = "",
                                 start_position = 800,
                                 end_position = 1500,
                                 batch.size = 200,
-                                vocabulary = c("l","p","a","g","c","t"),
-                                show_correlation = ""
+                                vocabulary = c("l","a","g","c","t"),
+                                show_correlation = FALSE,
                                 cell_number = 1){
 
 library(shiny)
@@ -150,15 +148,9 @@ server <- function(input, output, session) {
     if (input$selectinput_dataset == "Calculated Response"){
       req(sequence())
       if (sample == ""){
-        progress <- shiny::Progress$new()
-        progress$set(message = "Preprocessing fasta file and computing states ...", value = 1)
-          
-        states <- getStatesFromFasta(model,
-                                     fasta.path = fasta.path,
-                                     maxlen = maxlen,
-                                     batch.size = batch.size)
-        on.exit(progress$close())
-        states}
+          progress <- shiny::Progress$new()
+          progress$set(message = "No sample given...", value = 1)
+          on.exit(progress$close())}
       else{
         preprocessed_text <- preprocessSemiRedundant(char = sequence(), 
                                                      maxlen = maxlen, 
@@ -201,21 +193,21 @@ server <- function(input, output, session) {
     metadata
   })
   
-  # Load nate of the genome
-  taxadata <- reactive({
-    req(input$selectinput_states)
-    progress <- shiny::Progress$new()
-    progress$set(message = "Loading taxon annotation ...", value = 1)
-    taxadata <-
-      read.table(
-        paste0("data/ncbi_data/meta/", input$selectinput_states),
-        header = T,
-        stringsAsFactors = F,
-        sep = "\t"
-      )
-    on.exit(progress$close())
-    taxadata
-  })
+  # # Load nate of the genome
+  # taxadata <- reactive({
+  #   req(input$selectinput_states)
+  #   progress <- shiny::Progress$new()
+  #   progress$set(message = "Loading taxon annotation ...", value = 1)
+  #   taxadata <-
+  #     read.table(
+  #       paste0("data/ncbi_data/meta/", input$selectinput_states),
+  #       header = T,
+  #       stringsAsFactors = F,
+  #       sep = "\t"
+  #     )
+  #   on.exit(progress$close())
+  #   taxadata
+  # })
   
   # Create data with the repeat responses for the table and the plot 
   within_repeat_data <- reactive({
@@ -243,12 +235,6 @@ server <- function(input, output, session) {
     dy <- dygraph(cell_df, group = "a", main = "" ) %>%
       dyLegend(show = "onmouseover", hideOnMouseOut = FALSE)  %>%
       dyOptions(stepPlot = TRUE) %>% dyRangeSelector(dateWindow = c(start_position, end_position))
-    
-    
-    if (input$selectinput_dataset == "Examples"){
-      dy <- dygraph(cell_df, group = "a", main = paste0(taxadata()$taxa)) %>%
-        dyLegend(show = "onmouseover", hideOnMouseOut = FALSE)  %>%
-        dyOptions(stepPlot = TRUE) %>% dyRangeSelector(dateWindow = c(start_position, end_position))}
 
     if (!is.null(metadata()))
       if (input$selectinput_dataset == "Examples"){
@@ -262,15 +248,21 @@ server <- function(input, output, session) {
   output$dygraph2 <- renderDygraph({
     cell_df <- data.frame(pos = 1:nrow(dataset()),
                           rep(0,nrow(dataset())))
-    genome <- read_lines(paste0("data/ncbi_data/genome/", input$selectinput_states))
-    ribbonData <- nucleotide2value(genome) # nucleotides into values [A = 0; C = 0.33; G = 0.66: T = 1]
-  
+    if (input$selectinput_dataset == "Examples"){
+      genome <- read_lines(paste0("data/ncbi_data/genome/", input$selectinput_states))
+      ribbonData <- nucleotide2value(genome)} # nucleotides into values [A = 0; C = 0.33; G = 0.66: T = 1]
+    else { 
+      genome <- sample
+      ribbonData <- nucleotide2value(genome)} # nucleotides into values [A = 0; C = 0.33; G = 0.66: T = 1]}
+    
     dy <- dygraph(cell_df, group = "a") %>%
       dyRibbon(data = ribbonData, top = 1, bottom = 0, palette=c("yellow", "red", "green", "blue"))
       # [A = yellow; C = red; G = green: T = blue]
     dy    
   })
   
+  
+  if (show_correlation == TRUE){
   output$pairs <- renderPairsD3({
     cell_num <- as.numeric(input$selectinput_cell)
     states_df <- dataset()[, cell_num]
@@ -304,8 +296,10 @@ server <- function(input, output, session) {
   
   output$plot1 <- renderPlot({
     dat <- as.data.frame(within_repeat_data())
-    p <- ggplot(dat, aes(x = repeat_responses, y = non_repeat_responses, color = diff)) + geom_point()
+    p <- ggplot(dat, aes(x = repeat_responses, y = non_repeat_responses, color = diff)) + geom_point() +
+      scale_color_gradient(low = "blue", high = "red")
     print(p)}, height = 500) 
-  }
+  }} 
+
 # Run the application ----------------------------------------------------------
 shinyApp(ui = ui, server = server)}

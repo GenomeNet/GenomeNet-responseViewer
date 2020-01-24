@@ -21,13 +21,11 @@ keras::install_keras(tensorflow = "gpu")
 ```
 
 To install the GenomeNet-ResponseViewer use:
-```bash
-devtools::install_github("hiddengenome/GenomeNet-ResponseViewer")
-```
-Or download the Zip-File and extract the files. Choose the directory and enter  
+Download the Zip-File and extract the files. Choose the directory and enter  
 ```bash
 source("app.R")
 ```
+In the future this will be integrated into deepG. 
 
 ## Running GenomeNet-responseViewer
 
@@ -39,27 +37,24 @@ visualizePrediction()
 
 Please enter a genomic sequence (nucleotides) in the input area (or upload a fasta file). Hidden states will be infered using the deepG package and visualized. You can select different cells and different models. Also there are three examples available: The hidden states to "Bacteroides fragilis_CRISPR_example" are calculated with the newest model on CPU. The position of the repeats are colored with grey and you can zoom in and out the graphic.
 
-** "Bacteroides fragilis_CRISPR_example" **
-Data from the [CRISPRs Database](https://crispr.i2bc.paris-saclay.fr/crispr/)
+**CRISPR Sample from Bacteroides fragilis**
+data from the [CRISPRs Database](https://crispr.i2bc.paris-saclay.fr/crispr/)
 ![Web app](www/CRISPR_example.png)
 
-![Web app](www/figurea.png)
-![Web app](www/figureb.png)
-
-![Web app](www/correlation.png)
-
-** GCF_000006605.1_ASM660v1_genomic **
 ![Web app](www/figure1.png)
-
-** GCF_000008365.1_ASM836v1_genomic **
 ![Web app](www/figure2.png)
+
+**CRISPR Sample from Lactobacillus acidophilus**
+data from the [CRISPRs Database](https://crispr.i2bc.paris-saclay.fr/crispr/)
+![Web app](www/Lacto_CRISPR_example.png)
+![Web app](www/figure3.png)
 
 ### Usage:
 
 The parameters `sample`,`model.path`,`start_position`,`end_position`,`batch.size`,`vocabulary` and `cell_number` is currently available, more parameters will be added over the time. An easy example is `visualizePrediction(strrep("ATGCGTA",1000))`
 
 ```bash
-visualizePrediction(sample = read_file("data/CRISPR_Example.txt"), model.path = "data/models/cpu_model.hdf5", vocabulary = c("l","a","g","c","t"), cell_number = 6, start_position = 300, end_position = 900)
+visualizePrediction(sample = strrep("ATGCGTACGTCAGTA", 100), model.path = "data/models/cpu_model.hdf5", vocabulary = c("l","a","g","c","t"), cell_number = 6, start_position = 300, end_position = 900)
 ```
-![Web app](www/figure3.png)
+![Web app](www/figure4.png)
 
