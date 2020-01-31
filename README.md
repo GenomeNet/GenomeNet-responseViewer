@@ -49,7 +49,7 @@ Please enter a genomic sequence (nucleotides) in the input area (or upload a fas
 
 ### Usage:
 
-The parameters `sample`,`model.path`,`start_position`,`end_position`,`batch.size`,`vocabulary` and `cell_number` is currently available, more parameters will be added over the time. An easy example is `visualizePrediction(strrep("ATGCGTA",1000))`
+The parameters `sample`,`model.path`,`start_position`,`end_position`,`batch.size`,`vocabulary`,`show_correlation` and `cell_number` is currently available, more parameters will be added over the time. An easy example is `visualizePrediction(strrep("ATGCGTA",1000))`
 
 ```bash
 visualizePrediction(sample = strrep("ATGCGTACGTCAGTA", 100), model.path = "data/models/cpu_model.hdf5", vocabulary = c("l","a","g","c","t"), cell_number = 6, start_position = 300, end_position = 900)
