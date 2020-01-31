@@ -1,10 +1,5 @@
 #' Dygraph shading to color interesting places in the genome
 #' 
-#' Note: For Annotation use:
-#' presAnnotation <- function(dygraph, x, text) {
-#'   dygraph %>%
-#'     dyAnnotation(x, text, attachAtBottom = TRUE, width = 60, height= 20)
-#' }
 #' @param dy the dygraph
 #' @param from begin from the shading
 #' @param to end from the shading
@@ -20,6 +15,7 @@ vec_dyShading <- function(dy, from, to, colour){
 }
 
 #' Change nucleotides to values
+#' 
 #' @param nucleotides nucleotides from the genomic sequence
 #' @export
 nucleotide2value <- function(nucleotides){
@@ -38,12 +34,7 @@ nucleotide2value <- function(nucleotides){
 #' \code{preprocessSemiRedudant()} and the states are calculated with \code{getStatus()}.
 #' 
 #' @param sample character input string of text
-#' @param fasta.path path to fasta files
 #' @param model.path path to trained model, default "data/models"
-#' @param genome used genome
-#' @param taxadata data from the used genome (name, taxon)
-#' @param metadata data from the used genome (CRISPR regions)
-#' @param states load calculated states to visualize them
 #' @param start_position start from the dygraph
 #' @param end_position end from the dygraph
 #' @param batch.size number of samples
@@ -52,15 +43,12 @@ nucleotide2value <- function(nucleotides){
 #' @param cell_number cell_number showed in the dygraph
 #' @export
 visualizePrediction <- function(sample = "",
-                                fasta.path = "",
                                 model.path = "data/models/cpu_model.hdf5",
-                                metadata = "",
-                                states_path = "",
                                 start_position = 800,
                                 end_position = 1500,
                                 batch.size = 200,
                                 vocabulary = c("l","a","g","c","t"),
-                                show_correlation = FALSE,
+                                show_correlation = TRUE,
                                 cell_number = 1){
 
 library(shiny)
@@ -81,7 +69,7 @@ library(ape)
 ui <- fluidPage(theme = shinytheme("flatly"),
                 
                 # Application title --------------------------------------------
-                titlePanel("Response Viewer from deepG", windowTitle = 'GenomeNet'),
+                titlePanel("Response Viewer for deepG", windowTitle = 'GenomeNet'),
                 
                 # Inputs -------------------------------------------------------
                 tags$p(tags$b("GenomeNet:"),
@@ -135,7 +123,7 @@ server <- function(input, output, session) {
   sequence  <- reactive({
     if (input$selectinput_dataset == "Calculated Response") {
       if (sample == "") 
-        {output <- fasta.path}
+        {output <- ""}
       else 
         {output <- sample}
       output}
@@ -193,22 +181,6 @@ server <- function(input, output, session) {
     metadata
   })
   
-  # # Load nate of the genome
-  # taxadata <- reactive({
-  #   req(input$selectinput_states)
-  #   progress <- shiny::Progress$new()
-  #   progress$set(message = "Loading taxon annotation ...", value = 1)
-  #   taxadata <-
-  #     read.table(
-  #       paste0("data/ncbi_data/meta/", input$selectinput_states),
-  #       header = T,
-  #       stringsAsFactors = F,
-  #       sep = "\t"
-  #     )
-  #   on.exit(progress$close())
-  #   taxadata
-  # })
-  
   # Create data with the repeat responses for the table and the plot 
   within_repeat_data <- reactive({
     if (!is.null(dataset())) {
@@ -239,8 +211,6 @@ server <- function(input, output, session) {
     if (!is.null(metadata()))
       if (input$selectinput_dataset == "Examples"){
       dy <- vec_dyShading(dy, metadata()$from, metadata()$to, "lightgrey")} 
-      # color in the metadata then metadata()$color
-      # presAnnotation for annotation in the dygraph
       dy <- dyUnzoom(dy) 
     dy    
   })
