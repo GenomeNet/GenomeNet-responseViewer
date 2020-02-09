@@ -3,7 +3,7 @@
 #' @param dy the dygraph
 #' @param from begin from the shading
 #' @param to end from the shading
-#' @param color color 
+#' @param colour color 
 #' @export
 vec_dyShading <- function(dy, from, to, colour){
   for (i in seq_along(from)) {
@@ -28,31 +28,40 @@ nucleotide2value <- function(nucleotides){
 # Shiny app --------------------------------------------------------------------
 
 #' This is a Shiny web application for the visualization of hidden states of
-#' LSTM models from the package deepG. Examples are the states from GCF_000008365.1_
-#' ASM836v1_genomic and GCF_000006605.1_ASM660v1_genomic. It also comes with 
-#' the possibility to use own trained models. The sample is preprocessed with 
-#' \code{preprocessSemiRedudant()} and the states are calculated with \code{getStatus()}.
+#' LSTM models from the package deepG and additionally there are four examples. It also comes with 
+#' the possibility to use own trained models.
 #' 
 #' @param sample character input string of text
-#' @param model.path path to trained model, default "data/models"
+#' @param states if states = TRUE, then load states from states_path
+#' @param model.path path to trained model
+#' @param fasta.path path to fasta files
+#' @param states.path path to the .h5 file with the calculated states
 #' @param start_position start from the dygraph
 #' @param end_position end from the dygraph
-#' @param batch.size number of samples
+#' @param batch.size number of samples to evaluate at once
 #' @param vocabulary used vocabulary
 #' @param show_correlation when false it does not show the information about the correlation 
+#' @param layer_depth depth of layer to evaluate
 #' @param cell_number cell_number showed in the dygraph
+#' @param step frequency of sampling steps
+#' @param padding TRUE/FALSE generate states for the first maxlen nucleotides
 #' @export
 visualizePrediction <- function(sample = "",
-                                model.path = "data/models/cpu_model.hdf5",
-                                start_position = 800,
-                                end_position = 1500,
+                                states = FALSE,
+                                model.path = "",
+                                fasta.path = "",
+                                states.path = "",
+                                start_position = 0,
+                                end_position = 800,
                                 batch.size = 200,
                                 vocabulary = c("l","a","g","c","t"),
                                 show_correlation = TRUE,
-                                cell_number = 1){
+                                layer_depth = 1,
+                                cell_number = 1,
+                                step = 1,
+                                padding = TRUE){
 
 library(shiny)
-library(shinythemes)
 library(Biostrings)
 library(readr)
 library(quantmod)
@@ -66,10 +75,7 @@ library(dygraphs)
 library(ape)
 
 # UI (User inferace) -----------------------------------------------------------
-ui <- fluidPage(theme = shinytheme("flatly"),
-                
-                # Application title --------------------------------------------
-                titlePanel("Response Viewer for deepG", windowTitle = 'GenomeNet'),
+ui <- fluidPage(titlePanel("Response Viewer for deepG", windowTitle = 'GenomeNet'),
                 
                 # Inputs -------------------------------------------------------
                 tags$p(tags$b("GenomeNet:"),
@@ -116,40 +122,38 @@ ui <- fluidPage(theme = shinytheme("flatly"),
 server <- function(input, output, session) {
 
   # load maxlen from the model
-  model <- keras::load_model_hdf5(model.path) 
-  maxlen <- model$input$shape[1] 
   
-  # generate sequence from the sample 
-  sequence  <- reactive({
-    if (input$selectinput_dataset == "Calculated Response") {
-      if (sample == "") 
-        {output <- ""}
-      else 
-        {output <- sample}
-      output}
-    else {NULL}
-  })
+  if(is.null(states.path)){
+  model <- keras::load_model_hdf5(model.path) 
+  maxlen <- model$input$shape[1] }
 
-  # get the hidden states of the input sequence with getStates 
+  # get the hidden states of the input sequence
   dataset <- reactive({
     req(input$selectinput_dataset)
     if (input$selectinput_dataset == "Calculated Response"){
-      req(sequence())
-      if (sample == ""){
-          progress <- shiny::Progress$new()
-          progress$set(message = "No sample given...", value = 1)
-          on.exit(progress$close())}
+      if (states == TRUE){
+        progress <- shiny::Progress$new()
+        progress$set(message = "Load generated states ...", value = 1)
+        states <- readRowsFromH5(h5_path = states.path, complete = TRUE)
+        on.exit(progress$close())
+        states}
       else{
-        preprocessed_text <- preprocessSemiRedundant(char = sequence(), 
-                                                     maxlen = maxlen, 
-                                                     vocabulary = vocabulary)
+       if (sample == ""){
+        progress <- shiny::Progress$new()
+        progress$set(message = "Preprocessing and computing states from Fasta file...", value = 1)
+        writeStatesByFastaEntries(fasta.path = fasta.path, model.path = model.path, step = step, layer_depth = layer_depth,
+                                  vocabulary = vocabulary, batch.size = batch.size, filename = "fasta_states", 
+                                  padding = padding, h5_path = "data")
+        states <- readRowsFromH5(h5_path = "data/Nr1fasta_states.h5", complete = TRUE)
+        on.exit(progress$close())}
+      else{
         progress <- shiny::Progress$new()
         progress$set(message = "Preprocessing and computing states ...", value = 1)
-        states <-getStates(model.path = model.path,
-                           preprocessed_text$X,
-                           maxlen = maxlen)
+        states <- writeStatesToH5(model.path = model.path, sequence = sample, batch.size = batch.size, 
+                                  layer_depth = layer_depth, h5_filename = "states", vocabulary = vocabulary, 
+                                  step = step, returnStates = TRUE, padding = padding)
         on.exit(progress$close())}
-      states} 
+      states}}
     else {
       req(input$selectinput_states)
       progress <- shiny::Progress$new()
@@ -218,11 +222,21 @@ server <- function(input, output, session) {
   output$dygraph2 <- renderDygraph({
     cell_df <- data.frame(pos = 1:nrow(dataset()),
                           rep(0,nrow(dataset())))
+    
     if (input$selectinput_dataset == "Examples"){
       genome <- read_lines(paste0("data/ncbi_data/genome/", input$selectinput_states))
       ribbonData <- nucleotide2value(genome)} # nucleotides into values [A = 0; C = 0.33; G = 0.66: T = 1]
+    
     else { 
       genome <- sample
+      
+      if(states == FALSE){
+        if (sample == ""){
+          genome <- Biostrings::readDNAStringSet(fasta.path)
+          genome <- paste0(paste(genome, collapse = "p"))}}
+        else{print("No data about sequence, shows only the calculated states")
+          genome <- ""}
+      
       ribbonData <- nucleotide2value(genome)} # nucleotides into values [A = 0; C = 0.33; G = 0.66: T = 1]}
     
     dy <- dygraph(cell_df, group = "a") %>%
