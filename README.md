@@ -37,5 +37,5 @@ To use a fasta.file use the `fasta.path` and to load states generated with the p
 ```bash
 visualizePrediction(sample = strrep("ATGCGTACGTCAGTA", 100), model.path = "data/models/cpu_model.hdf5", vocabulary = c("l","a","g","c","t"), cell_number = 6, start_position = 300, end_position = 900)
 ```
-![Web app](www/figure4.png)
+![Web app](www/figure.png)
 
