@@ -1,19 +1,3 @@
-#' Dygraph shading to color interesting places in the genome
-#' 
-#' @param dy the dygraph
-#' @param from begin from the shading
-#' @param to end from the shading
-#' @param colour color 
-#' @export
-vec_dyShading <- function(dy, from, to, colour){
-  for (i in seq_along(from)) {
-    dy <- dyShading(dy, from = from[i], 
-                    to = to[i],
-                    color = colour) #for different colours colors[i]
-  }
-  dy
-}
-
 #' Change nucleotides to values
 #' 
 #' @param nucleotides nucleotides from the genomic sequence
@@ -28,7 +12,7 @@ nucleotide2value <- function(nucleotides){
 # Shiny app --------------------------------------------------------------------
 
 #' This is a Shiny web application for the visualization of hidden states of
-#' LSTM models from the package deepG and additionally there are four examples. It also comes with 
+#' LSTM models from the package deepG. It also comes with 
 #' the possibility to use own trained models.
 #' 
 #' @param sample character input string of text
@@ -40,7 +24,6 @@ nucleotide2value <- function(nucleotides){
 #' @param end_position end from the dygraph
 #' @param batch.size number of samples to evaluate at once
 #' @param vocabulary used vocabulary
-#' @param show_correlation when false it does not show the information about the correlation 
 #' @param layer_depth depth of layer to evaluate
 #' @param cell_number cell_number showed in the dygraph
 #' @param step frequency of sampling steps
@@ -55,7 +38,6 @@ visualizePrediction <- function(sample = "",
                                 end_position = 800,
                                 batch.size = 200,
                                 vocabulary = c("l","a","g","c","t"),
-                                show_correlation = TRUE,
                                 layer_depth = 1,
                                 cell_number = 1,
                                 step = 1,
@@ -81,18 +63,6 @@ ui <- fluidPage(titlePanel("Response Viewer for deepG", windowTitle = 'GenomeNet
                 tags$p(tags$b("GenomeNet:"),
                     "For training deep neural LSTM networks for genomic modeling and visualising their hidden states,
                     please see our", tags$a("Wiki", href="https://github.com/hiddengenome/deepG/wiki"), "for help."),
-                   
-                selectInput(
-                    "selectinput_dataset",
-                    "Dataset:",
-                    c("Calculated Response","Examples"), width = "45%"),
-                    
-                conditionalPanel(
-                    condition = "input.selectinput_dataset == 'Examples'",
-                    selectInput(
-                        'selectinput_states',
-                        'Select example for the Cell Response:',
-                        choice = list.files('data/ncbi_data/genome/'), width = "45%")), 
                     
                 selectInput(
                     "selectinput_cell",
@@ -106,18 +76,7 @@ ui <- fluidPage(titlePanel("Response Viewer for deepG", windowTitle = 'GenomeNet
                 tabsetPanel(tabPanel(
                     "Cell Response:", 
                     dygraphOutput("dygraph"), 
-                    dygraphOutput("dygraph2", height = 80)),
-                    
-                tabPanel("Correlation:",
-                    pairsD3Output("pairs",
-                    width = "100%",
-                    height = 500)),
-                
-                tabPanel("Correlation from the Repeat-Responses:",
-                    DT::dataTableOutput("table1")),
-
-                tabPanel("Repeat-Response-Graph:",
-                    plotOutput("plot1"))))
+                    dygraphOutput("dygraph2", height = 80))))
 # SERVER -----------------------------------------------------------------------
 server <- function(input, output, session) {
 
@@ -129,8 +88,6 @@ server <- function(input, output, session) {
 
   # get the hidden states of the input sequence
   dataset <- reactive({
-    req(input$selectinput_dataset)
-    if (input$selectinput_dataset == "Calculated Response"){
       if (states == TRUE){
         progress <- shiny::Progress$new()
         progress$set(message = "Load generated states ...", value = 1)
@@ -153,54 +110,7 @@ server <- function(input, output, session) {
                                   layer_depth = layer_depth, h5_filename = "states", vocabulary = vocabulary, 
                                   step = step, returnStates = TRUE, padding = padding)
         on.exit(progress$close())}
-      states}}
-    else {
-      req(input$selectinput_states)
-      progress <- shiny::Progress$new()
-      progress$set(message = "Loading states from the examples ...", value = 1)
-      states <-
-        read.table(
-          paste0("data/ncbi_data/states/", input$selectinput_states),
-          header = F,
-          stringsAsFactors = F,
-          sep = ";")
-      on.exit(progress$close())
-      states}
-  })
-  
-  # Load coordinates of CRISPR information from the examples
-  metadata <- reactive({
-    req(input$selectinput_states)
-    progress <- shiny::Progress$new()
-    progress$set(message = "Loading array annotation ...", value = 1)
-    metadata <-
-      read.table(
-        paste0("data/ncbi_data/position/", input$selectinput_states),
-        header = F,
-        stringsAsFactors = F,
-        sep = ";"
-      )
-    on.exit(progress$close())
-    colnames(metadata) <- c("from", "to")
-    metadata
-  })
-  
-  # Create data with the repeat responses for the table and the plot 
-  within_repeat_data <- reactive({
-    if (!is.null(dataset())) {
-      responses <- dataset()
-      datalist = list()
-      for (i in 1:nrow(metadata())) {
-        datalist[[i]] <- metadata()[i,1]:metadata()[i,2]}
-      
-      repeat_posistions <- do.call(c, datalist)
-      repeat_responses <- colMeans(responses[repeat_posistions,])
-      non_repeat_responses <- colMeans(responses[-repeat_posistions,])
-      diff <- repeat_responses - non_repeat_responses
-      data <- rbind(repeat_responses, non_repeat_responses, diff)
-      as.data.frame(t(data))
-    }
-  })
+      states}})
   
   # Plotting -------------------------------------------------------------------
   output$dygraph <- renderDygraph({
@@ -211,23 +121,11 @@ server <- function(input, output, session) {
     dy <- dygraph(cell_df, group = "a", main = "" ) %>%
       dyLegend(show = "onmouseover", hideOnMouseOut = FALSE)  %>%
       dyOptions(stepPlot = TRUE) %>% dyRangeSelector(dateWindow = c(start_position, end_position))
-
-    if (!is.null(metadata()))
-      if (input$selectinput_dataset == "Examples"){
-      dy <- vec_dyShading(dy, metadata()$from, metadata()$to, "lightgrey")} 
-      dy <- dyUnzoom(dy) 
-    dy    
-  })
+    dy <- dyUnzoom(dy)})
   
   output$dygraph2 <- renderDygraph({
     cell_df <- data.frame(pos = 1:nrow(dataset()),
                           rep(0,nrow(dataset())))
-    
-    if (input$selectinput_dataset == "Examples"){
-      genome <- read_lines(paste0("data/ncbi_data/genome/", input$selectinput_states))
-      ribbonData <- nucleotide2value(genome)} # nucleotides into values [A = 0; C = 0.33; G = 0.66: T = 1]
-    
-    else { 
       genome <- sample
       
       if(states == FALSE){
@@ -237,53 +135,12 @@ server <- function(input, output, session) {
         else{print("No data about sequence, shows only the calculated states")
           genome <- ""}
       
-      ribbonData <- nucleotide2value(genome)} # nucleotides into values [A = 0; C = 0.33; G = 0.66: T = 1]}
+      ribbonData <- nucleotide2value(genome) # nucleotides into values [A = 0; C = 0.33; G = 0.66: T = 1]}
     
     dy <- dygraph(cell_df, group = "a") %>%
       dyRibbon(data = ribbonData, top = 1, bottom = 0, palette=c("yellow", "red", "green", "blue"))
       # [A = yellow; C = red; G = green: T = blue]
     dy    
-  })
-  
-  
-  if (show_correlation == TRUE){
-  output$pairs <- renderPairsD3({
-    cell_num <- as.numeric(input$selectinput_cell)
-    states_df <- dataset()[, cell_num]
-    cell_df <- data.frame(pos = 1:nrow(dataset()), states_df)
-    
-    # get the positions of repeat
-    datalist = list()
-    for (i in 1:nrow(metadata())) {
-      datalist[[i]] <- metadata()[i,1]:metadata()[i,2]}
-    
-    repeat_posistions <- do.call(c, datalist)
-    is_crispr <- rep("A", nrow(cell_df))
-    is_crispr[repeat_posistions] <- "B"
-  
-    pairsD3(
-      cell_df,
-      group = is_crispr,
-      cex = 1,
-      big = T,
-      opacity = 0.5,
-      leftmar = 10,
-      topmar = 0,
-      width = 750
-    )
-  })
-  
-  output$table1 <- DT::renderDataTable({
-    dat <- within_repeat_data()
-    DT::datatable(dat)
-  })
-  
-  output$plot1 <- renderPlot({
-    dat <- as.data.frame(within_repeat_data())
-    p <- ggplot(dat, aes(x = repeat_responses, y = non_repeat_responses, color = diff)) + geom_point() +
-      scale_color_gradient(low = "blue", high = "red")
-    print(p)}, height = 500) 
-  }} 
-
+  })}
 # Run the application ----------------------------------------------------------
 shinyApp(ui = ui, server = server)}

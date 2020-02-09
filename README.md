@@ -32,23 +32,7 @@ source("app.R")
 visualizePrediction()
 ```
 
-## Examples
-
-Please enter a genomic sequence (nucleotides) in the input area (or upload a fasta file). Hidden states will be infered using the deepG package and visualized. You can select different cells and different models. Also there are three examples available: The hidden states to "Bacteroides fragilis_CRISPR_example" are calculated with the newest model on CPU. The position of the repeats are colored with grey and you can zoom in and out the graphic.
-
-**CRISPR Sample from Bacteroides fragilis** from the [CRISPRs Database](https://crispr.i2bc.paris-saclay.fr/crispr/)
-![Web app](www/CRISPR_example.png)
-
-![Web app](www/figure1.png)
-![Web app](www/figure2.png)
-
-**CRISPR Sample from Lactobacillus acidophilus** from the [CRISPRs Database](https://crispr.i2bc.paris-saclay.fr/crispr/)
-![Web app](www/Lacto_CRISPR_example.png)
-![Web app](www/figure3.png)
-
-### Usage:
-
-An easy example is `visualizePrediction(strrep("ATGCGTA",1000))`. To use a fasta.file use the `fasta.path` and to load states generated with the package deepG use `states.path` and put `states` to TRUE.
+To use a fasta.file use the `fasta.path` and to load states generated with the package deepG use `states.path` and put `states` to TRUE.
 
 ```bash
 visualizePrediction(sample = strrep("ATGCGTACGTCAGTA", 100), model.path = "data/models/cpu_model.hdf5", vocabulary = c("l","a","g","c","t"), cell_number = 6, start_position = 300, end_position = 900)
