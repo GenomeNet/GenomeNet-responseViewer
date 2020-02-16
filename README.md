@@ -50,7 +50,7 @@ library(deepG)
 # Example for own sequence
 visualizePrediction(sample = "Your Genomsequence", model.path = model.path, vocabulary = vocabulary)
 
-# To load states written with writeStatesToH5() or writeStatesByFastaEntries() in .h5 f
+# To load states written with writeStatesToH5() or writeStatesByFastaEntries() in .h5
 visualizePrediction(states.path = states.path, states = TRUE)
 
 # To use fasta files
